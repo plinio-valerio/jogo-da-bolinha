@@ -67,18 +67,31 @@ class Body:
         self.vel_y += corpo.vel_y
         self.vel_modulo = math.sqrt(self.vel_x**2 + self.vel_y**2)
         self.vel_angulo = math.atan2(self.vel_y, self.vel_x)
-        
+    def get_normal_angle(self, x, y):
+        raise NotImplementedError
+    def draw(self, win):
+        self.body.draw(win)
+    def setFill(self, color):
+        self.body.setFill(color)
+    def setOutline(self, color):
+        self.body.setOutline(color)
+    def setWidth(self, width):
+        self.body.setWidth(width)
+
 class Ball(Body):
     def __init__(self, centro, raio, vel_x=.0, vel_y=.0):
         Body.__init__(self, Circle(centro, raio), raio, centro.getX(), centro.getY(), vel_x, vel_y)
     def get_normal_angle(self, x, y):
-        vector_x = x - self.pos_x
-        vector_y = y - self.pos_y
-        return math.atan2(vector_y, vector_x)
+        return math.atan2(y - self.pos_y, x - self.pos_x)
 
 class ConvexPolygon(Body):
-    pass
-
+    def __init__(self, centro, raio, n_lados, angulo=.0, vel_x=.0, vel_y=.0):
+        vertices = [Point(centro.getX() + raio * math.cos(angulo + i * math.tau / n_lados),
+                          centro.getY() + raio * math.sin(angulo + i * math.tau / n_lados)) for i in range(n_lados)]
+        poly = Polygon(vertices)
+        Body.__init__(self, centro.getX(), centro.getY(), vel_x, vel_y)
+    def get_normal_angle(self, x, y):
+        pass
 
 def sign(num):
     if num > 0:
@@ -87,9 +100,6 @@ def sign(num):
         return -1
     else:
         return 0
-
-def distance(p1, p2):
-    return math.sqrt((p1.getX() - p2.getX())**2 + (p1.getY() - p2.getY())**2)
 
 win = GraphWin("Bolinha...", width, height)
 win.setCoords(0, 0, width, height)
