@@ -33,6 +33,53 @@ n_obstaculos = 5
 
 ###################
 
+class Body:
+    def __init__(self, body, pos_x, pos_y, vel_x=.0, vel_y=.0):
+        self.body = body
+        self.pos_x_0 = pos_x
+        self.pos_y_0 = pos_y
+        self.pos_x = pos_x
+        self.pos_y = pos_y
+        self.vel_x_0 = vel_x
+        self.vel_y_0 = vel_y
+        self.vel_x = vel_x
+        self.vel_y = vel_y
+        self.vel_modulo = math.sqrt(self.vel_x**2 + self.vel_y**2)
+        self.vel_angulo = math.atan2(self.vel_y, self.vel_x)
+    def reset(self):
+        self.body.move(self.pos_x_0 - self.pos_x, self.pos_y_0 - self.pos_y)
+        self.pos_x = self.pos_x_0
+        self.pos_y = self.pos_y_0
+        self.vel_x = self.vel_x_0
+        self.vel_y = self.vel_y_0
+        self.vel_modulo = math.sqrt(self.vel_x**2 + self.vel_y**2)
+        self.vel_angulo = math.atan2(self.vel_y, self.vel_x)
+    def update(self, dt=1):
+        self.pos_x = self.pos_x + self.vel_x * dt
+        self.pos_y = self.pos_y + self.vel_y * dt
+        self.corpo.move(self.vel_x * dt, self.vel_y * dt)
+    def collide(self, corpo):
+        angulo_normal = corpo.get_normal_angle(self.pos_x, self.pos_y)  # FIXME
+        novo_angulo = math.pi + 2*angulo_normal - self.vel_angulo  # == math.pi - (self.vel_angulo - angulo_normal) + angulo_normal
+        self.vel_x = self.vel_modulo * math.cos(novo_angulo)
+        self.vel_y = self.vel_modulo * math.sin(novo_angulo)
+        self.vel_x += corpo.vel_x
+        self.vel_y += corpo.vel_y
+        self.vel_modulo = math.sqrt(self.vel_x**2 + self.vel_y**2)
+        self.vel_angulo = math.atan2(self.vel_y, self.vel_x)
+        
+class Ball(Body):
+    def __init__(self, centro, raio, vel_x=.0, vel_y=.0):
+        Body.__init__(self, Circle(centro, raio), raio, centro.getX(), centro.getY(), vel_x, vel_y)
+    def get_normal_angle(self, x, y):
+        vector_x = x - self.pos_x
+        vector_y = y - self.pos_y
+        return math.atan2(vector_y, vector_x)
+
+class ConvexPolygon(Body):
+    pass
+
+
 def sign(num):
     if num > 0:
         return 1
