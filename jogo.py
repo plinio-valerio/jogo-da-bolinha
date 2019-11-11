@@ -15,7 +15,7 @@ raio_bola = 15  # raio da bolinha
 fill_bola = color_rgb(10, 10, 100)  # cor de preenchimento da bolinha
 outline_bola = color_rgb(255, 255, 0)  # cor do contorno da bolinha
 
-velocidade_barra = 9.0  # passo horizontal da barra a cada comando do jogador
+velocidade_barra = 20.0  # passo horizontal da barra a cada comando do jogador
 fill_barra = color_rgb(100, 10, 10)  # cor de preenchimento da barra
 outline_barra = color_rgb(255, 255, 0)  # cor do contorno da barra
 comprimento_barra = 100
@@ -198,7 +198,7 @@ linhaSuperior.setWidth(10)
 linhaSuperior.setFill(color_rgb(10, 100, 10))
 
 linhaInferior = Wall(Point(dl, dd), Point(width - dr, dd))
-linhaInferior.setWidth(3)
+linhaInferior.setWidth(10)
 linhaInferior.setFill(color_rgb(10, 100, 10))
 
 linhaEsquerda = Wall(Point(dl, dd), Point(dl, height - du))
@@ -334,9 +334,11 @@ for temp in range(1):
         # movimento horizontal da barra pelas setas direita/esquerda
         tecla = win.checkKey()
         if (tecla == "Right" or tecla == 'd'):
-            barra.vel_x += velocidade_barra
+            barra.vel_x = velocidade_barra
         if (tecla == "Left" or tecla == 'a'):
-            barra.vel_x -= velocidade_barra
+            barra.vel_x = -velocidade_barra
+        if (tecla == ''):
+            barra.vel_x = 0
         # sair do jogo
         if tecla == "Escape":
             game_over()
