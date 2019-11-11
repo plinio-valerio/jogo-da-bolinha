@@ -11,7 +11,7 @@ dl = 40  # distancia da linha esquerda para o limite esquerdo da tela
 dr = 40  # distancia da linha direita para o limite direito da tela
 db = 30  # distancia da barra para a linha inferior
 
-raio_bola = 10  # raio da bolinha
+raio_bola = 15  # raio da bolinha
 fill_bola = color_rgb(10, 10, 100)  # cor de preenchimento da bolinha
 outline_bola = color_rgb(255, 255, 0)  # cor do contorno da bolinha
 
@@ -52,6 +52,7 @@ class Body:
         self.vel_angulo = math.atan2(self.vel_y, self.vel_x)
         self.obstacles = []
         self.nao_colidiu = []
+        self.width = 1
     def reset(self):
         self.body.move(self.pos_x_0 - self.pos_x, self.pos_y_0 - self.pos_y)
         self.pos_x = self.pos_x_0
@@ -115,6 +116,7 @@ class Body:
     def setOutline(self, color):
         self.body.setOutline(color)
     def setWidth(self, width):
+        self.width = width
         self.body.setWidth(width)
 
 class Ball(Body):
@@ -183,7 +185,7 @@ class Wall(Body):
         a = p1.getY() - p2.getY()
         b = p2.getX() - p1.getX()
         distancia_bola_para_aresta = math.fabs(a * (projetil.pos_x - p1.getX()) + b * (projetil.pos_y - p1.getY())) / math.sqrt(a**2 + b**2)
-        if distancia_bola_para_aresta > projetil.radius:
+        if distancia_bola_para_aresta > projetil.radius + self.width:
             return None
         # return math.atan(-a/b) + math.tau/4
         return self.normal_angle
@@ -306,7 +308,7 @@ for temp in range(1):
                         (height - du - dd - db) / 3 * random.random() + 2 * (height - du - dd - db) / 3 + dd + db )
         radius = random.random() * 25 + 25
         vel_x = random.gauss(0, 2)
-        if random.random() < .33:  # probabilidade de obstaculo ser um circulo
+        if random.random() < .5:  # probabilidade de obstaculo ser um circulo
             obst = Ball(center, radius, vel_x=vel_x)
         else:
             n_lados = random.randint(3, 8)
