@@ -15,7 +15,7 @@ raio_bola = 10  # raio da bolinha
 fill_bola = color_rgb(10, 10, 100)  # cor de preenchimento da bolinha
 outline_bola = color_rgb(255, 255, 0)  # cor do contorno da bolinha
 
-velocidade_barra = 25  # passo horizontal da barra a cada comando do jogador
+velocidade_barra = 9.0  # passo horizontal da barra a cada comando do jogador
 fill_barra = color_rgb(100, 10, 10)  # cor de preenchimento da barra
 outline_barra = color_rgb(255, 255, 0)  # cor do contorno da barra
 comprimento_barra = 100
@@ -78,7 +78,7 @@ class Body:
             return False
         return True
     def collide(self, obstacle, modify):
-        angulo_normal = obstacle.get_normal_angle(self.pos_x, self.pos_y)
+        angulo_normal = obstacle.get_normal_angle(self)
         if angulo_normal is None:
             return False
         if modify:
@@ -91,7 +91,7 @@ class Body:
             self.vel_angulo = math.atan2(self.vel_y, self.vel_x)
         return True
     def random_collide(self, obstacle, modify, mean=.0, std=math.tau/32):
-        angulo_normal = obstacle.get_normal_angle(self.pos_x, self.pos_y)
+        angulo_normal = obstacle.get_normal_angle(self)
         if angulo_normal is None:
             return False
         if modify:
@@ -104,7 +104,7 @@ class Body:
                 self.vel_x = self.vel_modulo * math.cos(self.vel_angulo)
                 self.vel_y = self.vel_modulo * math.sin(self.vel_angulo)
         return True
-    def get_normal_angle(self, x, y):
+    def get_normal_angle(self, corpo):
         raise NotImplementedError
     def draw(self, win):
         self.body.draw(win)
@@ -120,10 +120,10 @@ class Body:
 class Ball(Body):
     def __init__(self, centro, raio, vel_x=.0, vel_y=.0):
         self.radius = raio
-        Body.__init__(self, Circle(centro, raio), raio, centro.getX(), centro.getY(), vel_x, vel_y)
+        Body.__init__(self, Circle(centro, raio), centro.getX(), centro.getY(), vel_x, vel_y)
     def get_normal_angle(self, projetil):
         if self.is_in_collision_zone(projetil):
-            return math.atan2(p_colisao_y - self.pos_y, p_colisao_x - self.pos_x)
+            return math.atan2(projetil.pos_y - self.pos_y, projetil.pos_x - self.pos_x)
         return None
 
 class RegularPolygon(Body):
@@ -138,13 +138,13 @@ class RegularPolygon(Body):
     def get_normal_angle(self, projetil):
         if not self.is_in_collision_zone(projetil):
             return None
-        vertices_ordenados = sorted(self.vertices, lambda p: math.sqrt((p.getX() - projetil.pos_x)**2 + (p.getY() - projetil.pos_y)**2))
+        vertices_ordenados = sorted(self.vertices, key = lambda p: math.sqrt((p.getX() - projetil.pos_x)**2 + (p.getY() - projetil.pos_y)**2))
         p1 = vertices_ordenados[0]
         p2 = vertices_ordenados[1]
         # parametros da equacao da reta (aresta do poligono)
         a = p1.getY() - p2.getY()
         b = p2.getX() - p1.getX()
-        distancia_bola_para_aresta = math.fabs(a * (col - p1.getX()) + b * (lin - p1.getY())) / math.sqrt(a**2 + b**2)
+        distancia_bola_para_aresta = math.fabs(a * (projetil.pos_x - p1.getX()) + b * (projetil.pos_y - p1.getY())) / math.sqrt(a**2 + b**2)
         if distancia_bola_para_aresta > projetil.radius:
             return None
         return math.atan(-a/b) + math.tau/4
@@ -188,14 +188,14 @@ class Wall(Body):
         # return math.atan(-a/b) + math.tau/4
         return self.normal_angle
 
-win = GraphWin("Bolinha com esteroides", width, height)
+win = GraphWin("Bolinha com Esteroides", width, height)
 win.setCoords(0, 0, width, height)
 
 linhaSuperior = Wall(Point(dl, height - du), Point(width - dr, height - du))
 linhaSuperior.setWidth(10)
 linhaSuperior.setFill(color_rgb(10, 100, 10))
 
-linhaInferior = Line(Point(dl, dd), Point(width - dr, dd))
+linhaInferior = Wall(Point(dl, dd), Point(width - dr, dd))
 linhaInferior.setWidth(3)
 linhaInferior.setFill(color_rgb(10, 100, 10))
 
@@ -216,7 +216,7 @@ info_txt = Text(Point(width / 2, 25), '')
 info_txt.setSize(14)
 def atualiza_texto():
     info_txt.undraw()
-    info_txt.setText("Pontos: " + str(pontos) + "\t\tVidas: " + str(vidas) + "\t\tVelocidade: %.2f" % math.sqrt(vel_x**2 + vel_y**2))
+    info_txt.setText("Pontos: " + str(pontos) + "\t\tVidas: " + str(vidas) + "\t\tVelocidade: %.2f" % bola.vel_modulo)
     info_txt.draw(win)
 
 # barra
@@ -298,14 +298,20 @@ for temp in range(1):
     linhaEsquerda.draw(win)
     linhaDireita.draw(win)
     espaco_branco.draw(win)
+    bola.draw(win)
+    barra.draw(win)
+    obstaculos = []
     for i in range(n_obstaculos):  # cria obstaculos
         center = Point( (width - dr - dl) * random.random(),
                         (height - du - dd - db) / 3 * random.random() + 2 * (height - du - dd - db) / 3 + dd + db )
-        radius = random.random() * 20 + 20
+        radius = random.random() * 25 + 25
+        vel_x = random.gauss(0, 2)
         if random.random() < .33:  # probabilidade de obstaculo ser um circulo
-            obst = Ball(center, radius)
+            obst = Ball(center, radius, vel_x=vel_x)
         else:
-            obst = RegularPolygon(center, radius, random.randint(3, 8))
+            n_lados = random.randint(3, 8)
+            angulo = random.random() * math.tau / n_lados
+            obst = RegularPolygon(center, radius, n_lados, angulo, vel_x=vel_x)
         color_r = random.randrange(0, 256)
         color_g = random.randrange(0, 256)
         color_b = random.randrange(0, 256)
@@ -313,7 +319,10 @@ for temp in range(1):
         obst.setOutline(color_rgb((color_r + 128) % 256, (color_g + 128) % 256, (color_b + 128) % 256))
         obst.setWidth(2)
         obst.draw(win)
-        bola.adicionar_obstaculo(obst)
+        obst.add_obstacle(linhaEsquerda)
+        obst.add_obstacle(linhaDireita)
+        bola.add_obstacle(obst)
+        obstaculos.append(obst)
     barra.reset()
     bola.reset()
     atualiza_texto()
@@ -330,6 +339,11 @@ for temp in range(1):
         if tecla == "Escape":
             game_over()
             break
+
+        bola.update()
+        barra.update()
+        for obst in obstaculos:
+            obst.update()
 
         # if col > colIni and col < colIni + comprimento_barra and lin < barra.getP1().getY() + raio_bola and lin > barra.getP2().getY():  # bateu na barra
         #     if bola_ainda_nao_colidiu_com_barra:
