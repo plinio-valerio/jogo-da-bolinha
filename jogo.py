@@ -12,6 +12,7 @@ dr = 40  # distancia da linha direita para o limite direito da tela
 db = 60  # distancia da barra para a linha inferior
 
 raio_bola = 15  # raio da bolinha
+vidas_iniciais = 3
 fill_bola = color_rgb(10, 10, 100)  # cor de preenchimento da bolinha
 outline_bola = color_rgb(255, 255, 0)  # cor do contorno da bolinha
 
@@ -62,6 +63,7 @@ class Body:
         self.obstacles = []
         self.nao_colidiu = []
         self.width = 1
+        self.n_colisoes = 0
     def reset(self):
         self.body.move(self.pos_x_0 - self.pos_x, self.pos_y_0 - self.pos_y)
         self.pos_x = self.pos_x_0
@@ -104,7 +106,7 @@ class Body:
             nova_vel_diff_perp = vel_diff_perp * (1 - obstacle.atrito)
             nova_vel_proj_norm = nova_vel_diff_norm + vel_obst_norm
             nova_vel_proj_perp = nova_vel_diff_perp + vel_obst_perp
-            if verbose:
+            if verbose:  # gera relatorio para debbug
                 print("Evento: colisao")
                 print("\tProjetil:", self.name)
                 print("\tObstaculo:", obstacle.name)
@@ -124,6 +126,8 @@ class Body:
             self.vel_angulo = math.atan2(nova_vel_proj_perp, nova_vel_proj_norm) + angulo_normal
             self.vel_x = self.vel_modulo * math.cos(self.vel_angulo)
             self.vel_y = self.vel_modulo * math.sin(self.vel_angulo)
+            self.n_colisoes += 1
+            obstacle.on_collision(self)
         return True
     def random_collide(self, obstacle, modify, mean=.0, std=math.tau/32):
         angulo_normal = obstacle.get_normal_angle(self)
@@ -139,6 +143,8 @@ class Body:
                 self.vel_x = self.vel_modulo * math.cos(self.vel_angulo)
                 self.vel_y = self.vel_modulo * math.sin(self.vel_angulo)
         return True
+    def on_collision(self, corpo):
+        pass
     def get_normal_angle(self, corpo):
         raise NotImplementedError
     def draw(self, win):
@@ -155,11 +161,12 @@ class Body:
 
 class Ball(Body):
     obj_idx = 0
-    def __init__(self, centro, raio, vel_x=.0, vel_y=.0, name=None):
+    def __init__(self, centro, raio, vel_x=.0, vel_y=.0, vidas=1, name=None):
         Ball.obj_idx += 1
         if name is None:
             name = 'Ball_' + str(Ball.obj_idx)
         self.radius = raio
+        self.vidas = vidas
         Body.__init__(self, Circle(centro, raio), centro.getX(), centro.getY(), vel_x, vel_y, name=name)
     def get_normal_angle(self, projetil):
         if self.is_in_collision_zone(projetil):
@@ -179,19 +186,38 @@ class RegularPolygon(Body):
                                centro.getY() + raio * math.sin(self.angle + i * math.tau / n_lados)) for i in range(n_lados)]
         poly = Polygon(self.vertices)
         Body.__init__(self, poly, centro.getX(), centro.getY(), vel_x, vel_y, name=name)
-    def get_normal_angle(self, projetil):
+    def get_normal_angle(self, projetil, verbose=False):
         if not self.is_in_collision_zone(projetil):
             return None
-        vertices_ordenados = sorted(self.vertices, key = lambda p: math.sqrt((p.getX() - projetil.pos_x)**2 + (p.getY() - projetil.pos_y)**2))
-        p1 = vertices_ordenados[0]
-        p2 = vertices_ordenados[1]
+        angulo_entre_vertices = math.tau / self.n_lados
+        angulo = math.atan2(projetil.pos_y - self.pos_y, projetil.pos_x - self.pos_x) - self.angle
+        idx_v = int(angulo // angulo_entre_vertices)
+        p1 = self.vertices[idx_v]
+        p2 = self.vertices[(idx_v - 1) % self.n_lados]
+
         # parametros da equacao da reta (aresta do poligono)
         a = p1.getY() - p2.getY()
         b = p2.getX() - p1.getX()
         distancia_bola_para_aresta = math.fabs(a * (projetil.pos_x - p1.getX()) + b * (projetil.pos_y - p1.getY())) / math.sqrt(a**2 + b**2)
+
+        if verbose:
+            print("Evento: possivel colisao")
+            print("\tProjetil:", projetil.name, "\t== (%d, %d)" % (projetil.pos_x, projetil.pos_y))
+            print("\tObstaculo:", self.name)
+            print("\tAngulo do poligono: %d" % int(self.angle / math.tau * 360))
+            print("\tAngulo do projetil: %d" % int(angulo / math.tau * 360))
+            print("\tVertices:  ", [(int(v.getX()), int(v.getY())) for v in self.vertices])
+            print("\tDistancias:", ["  %.2f" % math.sqrt((projetil.pos_x - v.getX())**2 + (projetil.pos_y - v.getY())**2) for v in self.vertices])
+            print("\tp1: (%d, %d)" % (p1.getX(), p1.getY()))
+            print("\tp2: (%d, %d)" % (p2.getX(), p2.getY()))
+            print("\ta = %.2f" % a)
+            print("\tb = %.2f" % b)
+            print("\tdist = %.2f" % distancia_bola_para_aresta)
+
         if distancia_bola_para_aresta > projetil.radius:
             return None
-        return math.atan(-a/b) + math.tau/4
+        # return math.atan(-a/b) + math.tau/4
+        return angulo // angulo_entre_vertices * angulo_entre_vertices + self.angle + angulo_entre_vertices / 2
         # angulo_entre_vertices = math.tau / self.n_lados
         # angulo = math.atan2(y, x) - self.angle
         # return angulo // angulo_entre_vertices * angulo_entre_vertices + angulo_entre_vertices / 2
@@ -219,10 +245,11 @@ class Bar(Body):
 
 class Wall(Body):
     obj_idx = 0
-    def __init__(self, p1, p2, name=None):
+    def __init__(self, p1, p2, name=None, kill=False):
         Wall.obj_idx += 1
         if name is None:
             name = 'Wall_' + str(Wall.obj_idx)
+        self.kill = kill
         pos_x = (p2.getX() + p1.getX()) / 2
         pos_y = (p2.getY() + p1.getY()) / 2
         self.radius = math.sqrt((p2.getX() - p1.getX())**2 + (p2.getY() - p1.getY())**2) / 2
@@ -239,6 +266,13 @@ class Wall(Body):
             return None
         # return math.atan(-a/b) + math.tau/4
         return self.normal_angle
+    def on_collision(self, projetil):
+        if self.kill:
+            projetil.vidas -= 1
+            if projetil.vidas <= 0:
+                return
+            projetil.reset()
+            time.sleep(1)
 
 ################################################################################
 ####                                  JOGO                                  ####
@@ -251,7 +285,7 @@ linhaSuperior = Wall(Point(dl, height - du), Point(width - dr, height - du), nam
 linhaSuperior.setWidth(10)
 linhaSuperior.setFill(color_rgb(10, 100, 10))
 
-linhaInferior = Wall(Point(dl, dd), Point(width - dr, dd), name="Parede_inf")
+linhaInferior = Wall(Point(dl, dd), Point(width - dr, dd), name="Parede_inf", kill=True)
 linhaInferior.setWidth(10)
 linhaInferior.setFill(color_rgb(10, 100, 10))
 
@@ -270,10 +304,6 @@ espaco_branco.setOutline('white')
 # texto
 info_txt = Text(Point(width / 2, 25), '')
 info_txt.setSize(14)
-def atualiza_texto():
-    info_txt.undraw()
-    info_txt.setText("Pontos: " + str(pontos) + "\t\tVidas: " + str(vidas) + "\t\tVelocidade: %.2f" % bola.vel_modulo)
-    info_txt.draw(win)
 
 # barra
 barra = Bar(Point(width/2 - comprimento_barra/2, dd + db + espessura_barra/2),
@@ -286,7 +316,7 @@ barra.add_obstacle(linhaEsquerda)
 barra.add_obstacle(linhaDireita)
 
 # bolinha
-bola = Ball(Point(width/2, height/2), raio_bola, vel_y=vel_inicial, name="Bolinha")
+bola = Ball(Point(width/2, height/2), raio_bola, vel_y=vel_inicial, vidas=vidas_iniciais, name="Bolinha")
 bola.setFill(fill_bola)
 bola.setOutline(outline_bola)
 bola.setWidth(2)
@@ -295,46 +325,6 @@ bola.add_obstacle(linhaInferior)
 bola.add_obstacle(linhaEsquerda)
 bola.add_obstacle(linhaDireita)
 bola.add_obstacle(barra)
-
-# def computa_colisao(poligono_regular, vel_x, vel_y):
-#     vertices = poligono_regular.getPoints()
-#     # calcula centro e raio do poligono
-#     centro_x = .0
-#     centro_y = .0
-#     for p in vertices:
-#         centro_x += p.getX()
-#         centro_y += p.getY()
-#     centro_x /= len(vertices)
-#     centro_y /= len(vertices)
-#     raio_poligono = math.sqrt((vertices[0].getX() - centro_x)**2 + (vertices[0].getY() - centro_y)**2)
-#     if math.sqrt((col - centro_x)**2 + (lin - centro_y)**2) - raio > raio_poligono:
-#         return vel_x, vel_y
-#     for idx, p1 in enumerate(vertices):
-#         p2 = vertices[(idx + 1) % len(vertices)]
-#         # parametros da equacao da reta (aresta do poligono)
-#         a = p1.getY() - p2.getY()
-#         b = p2.getX() - p1.getX()
-#         distancia_bola_para_aresta = math.fabs(a * (col - p1.getX()) + b * (lin - p1.getY())) / math.sqrt(a**2 + b**2)
-#         if distancia_bola_para_aresta < raio:
-#             return colisao(vel_x, vel_y, math.atan(-a/b) + math.tau/4)
-#     return vel_x, vel_y
-
-def game_over():
-    win.setBackground('white')
-    fim_txt = Text(Point(width/2, height/2), "GAME\nOVER")
-    fim_txt.setStyle('bold')
-    fim_txt.setSize(32)
-    fim_txt.draw(win)
-    time.sleep(2)
-    fim_txt.undraw()
-    info_txt.undraw()
-    linhaInferior.undraw()
-    linhaSuperior.undraw()
-    linhaEsquerda.undraw()
-    linhaDireita.undraw()
-    espaco_branco.undraw()
-    bola.undraw()
-    barra.undraw()
 
 # menu
 for temp in range(1):
@@ -348,8 +338,6 @@ for temp in range(1):
 
 
     # comeca jogo
-    vidas = 3
-    pontos = 0
     linhaSuperior.draw(win)
     linhaInferior.draw(win)
     linhaEsquerda.draw(win)
@@ -363,7 +351,7 @@ for temp in range(1):
         center = Point( (width - dr - dl - 2*radius) * random.random() + dl + radius,
                         (height - du - dd - db - radius) / 3 * random.random() + 2 * (height - du - dd - db) / 3 + dd + db )
         vel_x = random.gauss(0, 2)
-        if random.random() < .4:  # probabilidade de obstaculo ser um circulo
+        if random.random() < 1.0:  # probabilidade de obstaculo ser um circulo
             obst = Ball(center, radius, vel_x=vel_x)
         else:
             n_lados = random.randint(3, 8)
@@ -382,9 +370,10 @@ for temp in range(1):
         obstaculos.append(obst)
     barra.reset()
     bola.reset()
-    atualiza_texto()
     time.sleep(1)
 
+    t_steps = 0
+    t = .0
     while True:
         # movimento horizontal da barra pelas setas direita/esquerda
         tecla = win.checkKey()
@@ -401,40 +390,40 @@ for temp in range(1):
             barra.vel_modulo = 0
             barra.vel_angulo = 0
         if tecla == "Escape":  # sai do jogo
-            game_over()
-            break
+            bola.vidas = -1
 
         bola.update()
         barra.update()
         for obst in obstaculos:
             obst.update()
 
-        # if col > colIni and col < colIni + comprimento_barra and lin < barra.getP1().getY() + raio_bola and lin > barra.getP2().getY():  # bateu na barra
-        #     if bola_ainda_nao_colidiu_com_barra:
-        #         vel_x, vel_y = colisao_aleatoria(vel_x, vel_y)
-        #         pontos += 1
-        #         if pontos % pontos_por_fase == 0:
-        #             win.setBackground(color_rgb(random.randrange(0, 256), random.randrange(0, 256), random.randrange(0, 256)))
-        #             vel_x *= 1.2
-        #             vel_y *= 1.2
-        #         atualiza_texto()
-        #         bola_ainda_nao_colidiu_com_barra = False
-        # else:  # bola nao esta em contato com a barra
-        #     bola_ainda_nao_colidiu_com_barra = True
-        # if lin < dd + raio_bola:  # bateu na linha de baixo (morreu)
-        #     vidas -= 1
-        #     if vidas == 0:
-        #         game_over()
-        #         break
-        #     vel_mod = math.sqrt(vel_x**2 + vel_y**2)
-        #     vel_ang = math.tau/4 + math.tau/8 * (2*random.random() - 1)
-        #     vel_x = (vel_inicial + vel_mod) / 2 * math.cos(vel_ang)
-        #     vel_y = (vel_inicial + vel_mod) / 2 * math.sin(vel_ang)
-        #     reseta_bola()
-        #     reseta_barra()
-        #     atualiza_texto()
-        #     time.sleep(1)
+        if bola.vidas <= 0:
+            win.setBackground('white')
+            fim_txt = Text(Point(width / 2, height / 2), "GAME\nOVER")
+            fim_txt.setStyle('bold')
+            fim_txt.setSize(32)
+            fim_txt.draw(win)
+            time.sleep(2)
+            fim_txt.undraw()
+            info_txt.undraw()
+            linhaInferior.undraw()
+            linhaSuperior.undraw()
+            linhaEsquerda.undraw()
+            linhaDireita.undraw()
+            for obst in obstaculos:
+                obst.undraw()
+            espaco_branco.undraw()
+            bola.undraw()
+            barra.undraw()
+            break
+
+        if t_steps % 5 == 0:
+            info_txt.undraw()
+            info_txt.setText("Colisões: " + str(bola.n_colisoes) + "\t\tVidas: " + str(bola.vidas) + "\t\tVelocidade: %.2f" % bola.vel_modulo + "\t\tTempo: %.1f" % t)
+            info_txt.draw(win)
 
         time.sleep(dt)
+        t_steps += 1
+        t += dt
 
 win.close()
