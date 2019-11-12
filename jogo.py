@@ -42,7 +42,7 @@ def sign(num):
 
 class Body:
     obj_idx = 0
-    def __init__(self, body, pos_x=None, pos_y=None, vel_x=.0, vel_y=.0, name=None, atrito=.0):
+    def __init__(self, body, pos_x=None, pos_y=None, vel_x=.0, vel_y=.0, vidas=3, name=None, radius=None, kill=False, atrito=.0):
         Body.obj_idx += 1
         if name is None:
             self.name = 'Body_' + str(Body.obj_idx)
@@ -59,6 +59,10 @@ class Body:
         self.vel_y = vel_y
         self.vel_modulo = math.sqrt(self.vel_x**2 + self.vel_y**2)
         self.vel_angulo = math.atan2(self.vel_y, self.vel_x)
+        self.vidas = vidas
+        self.kill = kill
+        if radius is not None:
+            self.radius = radius
         self.atrito = atrito
         self.obstacles = []
         self.nao_colidiu = []
@@ -143,8 +147,12 @@ class Body:
                 self.vel_x = self.vel_modulo * math.cos(self.vel_angulo)
                 self.vel_y = self.vel_modulo * math.sin(self.vel_angulo)
         return True
-    def on_collision(self, corpo):
-        pass
+    def on_collision(self, projetil):
+        if self.kill:
+            projetil.vidas -= 1
+            projetil.on_death()
+    def on_death(self):
+        self.reset()
     def get_normal_angle(self, corpo):
         raise NotImplementedError
     def draw(self, win):
@@ -161,13 +169,13 @@ class Body:
 
 class Ball(Body):
     obj_idx = 0
-    def __init__(self, centro, raio, vel_x=.0, vel_y=.0, vidas=1, name=None):
+    def __init__(self, centro, raio, vel_x=.0, vel_y=.0, vidas=1, name=None, kill=False):
         Ball.obj_idx += 1
         if name is None:
             name = 'Ball_' + str(Ball.obj_idx)
         self.radius = raio
         self.vidas = vidas
-        Body.__init__(self, Circle(centro, raio), centro.getX(), centro.getY(), vel_x, vel_y, name=name)
+        Body.__init__(self, Circle(centro, raio), centro.getX(), centro.getY(), vel_x, vel_y, name=name, vidas=vidas, kill=kill)
     def get_normal_angle(self, projetil):
         if self.is_in_collision_zone(projetil):
             return math.atan2(projetil.pos_y - self.pos_y, projetil.pos_x - self.pos_x)
@@ -175,7 +183,7 @@ class Ball(Body):
 
 class RegularPolygon(Body):
     obj_idx = 0
-    def __init__(self, centro, raio, n_lados, angulo=.0, vel_x=.0, vel_y=.0, name=None):
+    def __init__(self, centro, raio, n_lados, angulo=.0, vel_x=.0, vel_y=.0, name=None, kill=False):
         RegularPolygon.obj_idx += 1
         if name is None:
             name = 'Poly_' + str(RegularPolygon.obj_idx)
@@ -185,7 +193,7 @@ class RegularPolygon(Body):
         self.vertices = [Point(centro.getX() + raio * math.cos(self.angle + i * math.tau / n_lados),
                                centro.getY() + raio * math.sin(self.angle + i * math.tau / n_lados)) for i in range(n_lados)]
         poly = Polygon(self.vertices)
-        Body.__init__(self, poly, centro.getX(), centro.getY(), vel_x, vel_y, name=name)
+        Body.__init__(self, poly, centro.getX(), centro.getY(), vel_x, vel_y, name=name, kill=kill)
     def get_normal_angle(self, projetil, verbose=False):
         if not self.is_in_collision_zone(projetil):
             return None
@@ -224,7 +232,7 @@ class RegularPolygon(Body):
 
 class Bar(Body):
     obj_idx = 0
-    def __init__(self, p1, p2, passo, atrito, vel_x_0=.0, name=None):
+    def __init__(self, p1, p2, passo, atrito, vel_x_0=.0, name=None, kill=False):
         Bar.obj_idx += 1
         if name is None:
             name = 'Bar_' + str(Bar.obj_idx)
@@ -234,7 +242,7 @@ class Bar(Body):
         self.length = math.fabs(p2.getX() - p1.getX())
         self.radius = math.sqrt((p2.getX() - p1.getX())**2 + (p2.getY() - p1.getY())**2) / 2
         self.normal_angle = math.tau / 4
-        Body.__init__(self, Rectangle(p1, p2), pos_x, pos_y, vel_x_0, .0, name=name, atrito=atrito)
+        Body.__init__(self, Rectangle(p1, p2), pos_x, pos_y, vel_x_0, .0, name=name, atrito=atrito, kill=kill)
     def get_normal_angle(self, projetil):
         if not self.is_in_collision_zone(projetil):
             return None
@@ -249,12 +257,11 @@ class Wall(Body):
         Wall.obj_idx += 1
         if name is None:
             name = 'Wall_' + str(Wall.obj_idx)
-        self.kill = kill
         pos_x = (p2.getX() + p1.getX()) / 2
         pos_y = (p2.getY() + p1.getY()) / 2
         self.radius = math.sqrt((p2.getX() - p1.getX())**2 + (p2.getY() - p1.getY())**2) / 2
         self.normal_angle = math.atan2(p2.getY() - p1.getY(), p2.getX() - p1.getX()) + math.tau / 4
-        Body.__init__(self, Line(p1, p2), pos_x, pos_y, name=name)
+        Body.__init__(self, Line(p1, p2), pos_x, pos_y, name=name, kill=kill)
     def get_normal_angle(self, projetil):
         p1 = self.body.getP1()
         p2 = self.body.getP2()
@@ -327,17 +334,19 @@ bola.add_obstacle(linhaDireita)
 bola.add_obstacle(barra)
 
 # menu
-for temp in range(1):
-    # menu_txt = Text(Point(width/2, heigth/2), '')
-    # menu_txt.setText('''
-    #                  Novo jogo\n
-    #                  \n
-    #                  Placar
-    #                  ''')
-
-
+while True:
+    win.setBackground('black')
+    inicio_txt = Text(Point(width / 2, height / 2), "Aperte qualquer tecla para iniciar\nPressione ESC para sair do jogo")
+    inicio_txt.setStyle('bold')
+    inicio_txt.setTextColor('white')
+    inicio_txt.setSize(32)
+    inicio_txt.draw(win)
+    tecla = win.getKey()
+    if (tecla == 'Escape'):
+        break
 
     # comeca jogo
+    win.setBackground('white')
     linhaSuperior.draw(win)
     linhaInferior.draw(win)
     linhaEsquerda.draw(win)
@@ -348,8 +357,8 @@ for temp in range(1):
     obstaculos = []
     for i in range(n_obstaculos):  # cria obstaculos
         radius = random.random() * 25 + 25
-        center = Point( (width - dr - dl - 2*radius) * random.random() + dl + radius,
-                        (height - du - dd - db - radius) / 3 * random.random() + 2 * (height - du - dd - db) / 3 + dd + db )
+        center = Point((width - dr - dl - 3*radius) * random.random() + dl + 1.5*radius,
+                       (height - du - dd - db - 2*radius) / 3 * random.random() + 2 * (height - du - dd - db) / 3 + dd + db)
         vel_x = random.gauss(0, 2)
         if random.random() < 1.0:  # probabilidade de obstaculo ser um circulo
             obst = Ball(center, radius, vel_x=vel_x)
@@ -398,7 +407,6 @@ for temp in range(1):
             obst.update()
 
         if bola.vidas <= 0:
-            win.setBackground('white')
             fim_txt = Text(Point(width / 2, height / 2), "GAME\nOVER")
             fim_txt.setStyle('bold')
             fim_txt.setSize(32)
