@@ -2,24 +2,26 @@ from graphics import *
 import random
 import math
 
-width = 800  # largura da tela
+width = 900  # largura da tela
 height = 600  # altura da tela
 
 du = 40  # distancia da linha superior para o limite superior da tela
 dd = 40  # distancia da linha inferior para o limite inferior da tela
 dl = 40  # distancia da linha esquerda para o limite esquerdo da tela
 dr = 40  # distancia da linha direita para o limite direito da tela
-db = 30  # distancia da barra para a linha inferior
+db = 50  # distancia da barra para a linha inferior
 
 raio_bola = 15  # raio da bolinha
 fill_bola = color_rgb(10, 10, 100)  # cor de preenchimento da bolinha
 outline_bola = color_rgb(255, 255, 0)  # cor do contorno da bolinha
 
-velocidade_barra = 20.0  # passo horizontal da barra a cada comando do jogador
-fill_barra = color_rgb(100, 10, 10)  # cor de preenchimento da barra
-outline_barra = color_rgb(255, 255, 0)  # cor do contorno da barra
 comprimento_barra = 100
 espessura_barra = 10
+velocidade_barra = 10.0  # passo horizontal da barra a cada comando do jogador
+atrito_barra = 0.5
+fill_barra = color_rgb(100, 10, 10)  # cor de preenchimento da barra
+outline_barra = color_rgb(255, 255, 0)  # cor do contorno da barra
+
 
 pontos_por_fase = 3  # quantidade de pontos necessaria para acelerar a bolinha
 vel_inicial = 6.0  # velocidade inicial da bolinha
@@ -38,7 +40,7 @@ def sign(num):
         return 0
 
 class Body:
-    def __init__(self, body, pos_x=None, pos_y=None, vel_x=.0, vel_y=.0):
+    def __init__(self, body, pos_x=None, pos_y=None, vel_x=.0, vel_y=.0, atrito=.0):
         self.body = body
         self.pos_x_0 = pos_x
         self.pos_y_0 = pos_y
@@ -50,6 +52,7 @@ class Body:
         self.vel_y = vel_y
         self.vel_modulo = math.sqrt(self.vel_x**2 + self.vel_y**2)
         self.vel_angulo = math.atan2(self.vel_y, self.vel_x)
+        self.atrito = atrito
         self.obstacles = []
         self.nao_colidiu = []
         self.width = 1
@@ -78,16 +81,27 @@ class Body:
         if distancia > corpo.radius + self.radius:
             return False
         return True
-    def collide(self, obstacle, modify):
+    def collide(self, obstacle, modify):  # retorna True caso o objeto esteja em contato com o obstaculo
         angulo_normal = obstacle.get_normal_angle(self)
         if angulo_normal is None:
             return False
         if modify:
+            print("###  NOVA COLISAO  ###")
+            print("Velocidade do projetil:")
+            print("\tCart.: (%.2f, \t%.2f)" % (self.vel_x, self.vel_y))
+            print("\tPolar: (%.2f, \t%.1f)" % (self.vel_modulo, self.vel_angulo / math.tau * 360))
+            print("Velocidade do obstaculo:")
+            print("\tCart.: (%.2f, \t%.2f)" % (obstacle.vel_x, obstacle.vel_y))
+            print("Angulo normal: %.1f" % (angulo_normal / math.tau * 360))
             novo_angulo = math.pi + 2*angulo_normal - self.vel_angulo  # == math.pi - (self.vel_angulo - angulo_normal) + angulo_normal
+            print("Novo angulo do projetil: %.1f" % (novo_angulo / math.tau * 360))
+            print()
+            # dv_x = obstacle.vel_x - self.vel_x
+            # dv_y = obstacle.vel_y - self.vel_y
             self.vel_x = self.vel_modulo * math.cos(novo_angulo)
             self.vel_y = self.vel_modulo * math.sin(novo_angulo)
-            self.vel_x += obstacle.vel_x
-            self.vel_y += obstacle.vel_y
+            self.vel_x += obstacle.vel_x * ((1-obstacle.atrito) * math.fabs(math.cos(angulo_normal)) + obstacle.atrito)
+            self.vel_y += obstacle.vel_y * ((1-obstacle.atrito) * math.fabs(math.sin(angulo_normal)) + obstacle.atrito)
             self.vel_modulo = math.sqrt(self.vel_x**2 + self.vel_y**2)
             self.vel_angulo = math.atan2(self.vel_y, self.vel_x)
         return True
@@ -155,14 +169,14 @@ class RegularPolygon(Body):
         # return angulo // angulo_entre_vertices * angulo_entre_vertices + angulo_entre_vertices / 2
 
 class Bar(Body):
-    def __init__(self, p1, p2, vel_x=.0, vel_y=.0):
+    def __init__(self, p1, p2, passo, atrito, vel_x_0=.0):
         pos_x = (p1.getX() + p2.getX()) / 2
         pos_y = (p1.getY() + p2.getY()) / 2
         self.height = math.fabs(p2.getY() - p1.getY())
         self.length = math.fabs(p2.getX() - p1.getX())
         self.radius = math.sqrt((p2.getX() - p1.getX())**2 + (p2.getY() - p1.getY())**2) / 2
         self.normal_angle = math.tau / 4
-        Body.__init__(self, Rectangle(p1, p2), pos_x, pos_y, vel_x, vel_y)
+        Body.__init__(self, Rectangle(p1, p2), pos_x, pos_y, vel_x_0, .0, atrito)
     def get_normal_angle(self, projetil):
         if not self.is_in_collision_zone(projetil):
             return None
@@ -189,6 +203,10 @@ class Wall(Body):
             return None
         # return math.atan(-a/b) + math.tau/4
         return self.normal_angle
+
+################################################################################
+####                                  JOGO                                  ####
+################################################################################
 
 win = GraphWin("Bolinha com Esteroides", width, height)
 win.setCoords(0, 0, width, height)
@@ -223,7 +241,8 @@ def atualiza_texto():
 
 # barra
 barra = Bar(Point(width/2 - comprimento_barra/2, dd + db + espessura_barra/2),
-            Point(width/2 + comprimento_barra/2, dd + db - espessura_barra/2))
+            Point(width/2 + comprimento_barra/2, dd + db - espessura_barra/2),
+            velocidade_barra, atrito_barra)
 barra.setFill(fill_barra)
 barra.setOutline(outline_barra)
 barra.setWidth(2)
@@ -304,11 +323,11 @@ for temp in range(1):
     barra.draw(win)
     obstaculos = []
     for i in range(n_obstaculos):  # cria obstaculos
-        center = Point( (width - dr - dl) * random.random(),
-                        (height - du - dd - db) / 3 * random.random() + 2 * (height - du - dd - db) / 3 + dd + db )
         radius = random.random() * 25 + 25
+        center = Point( (width - dr - dl - 2*radius) * random.random() + dl + radius,
+                        (height - du - dd - db - radius) / 3 * random.random() + 2 * (height - du - dd - db) / 3 + dd + db )
         vel_x = random.gauss(0, 2)
-        if random.random() < .5:  # probabilidade de obstaculo ser um circulo
+        if random.random() < .4:  # probabilidade de obstaculo ser um circulo
             obst = Ball(center, radius, vel_x=vel_x)
         else:
             n_lados = random.randint(3, 8)
@@ -339,8 +358,7 @@ for temp in range(1):
             barra.vel_x = -velocidade_barra
         if (tecla == ''):
             barra.vel_x = 0
-        # sair do jogo
-        if tecla == "Escape":
+        if tecla == "Escape":  # sai do jogo
             game_over()
             break
 
