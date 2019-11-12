@@ -2,14 +2,14 @@ from graphics import *
 import random
 import math
 
-width = 900  # largura da tela
-height = 600  # altura da tela
+width = 960  # largura da tela
+height = 640  # altura da tela
 
 du = 40  # distancia da linha superior para o limite superior da tela
 dd = 40  # distancia da linha inferior para o limite inferior da tela
 dl = 40  # distancia da linha esquerda para o limite esquerdo da tela
 dr = 40  # distancia da linha direita para o limite direito da tela
-db = 50  # distancia da barra para a linha inferior
+db = 60  # distancia da barra para a linha inferior
 
 raio_bola = 15  # raio da bolinha
 fill_bola = color_rgb(10, 10, 100)  # cor de preenchimento da bolinha
@@ -17,8 +17,8 @@ outline_bola = color_rgb(255, 255, 0)  # cor do contorno da bolinha
 
 comprimento_barra = 100
 espessura_barra = 10
-velocidade_barra = 10.0  # passo horizontal da barra a cada comando do jogador
-atrito_barra = 0.5
+velocidade_barra = 20.0  # passo horizontal da barra a cada comando do jogador
+atrito_barra = 0.2  # numero entre 0 e 1
 fill_barra = color_rgb(100, 10, 10)  # cor de preenchimento da barra
 outline_barra = color_rgb(255, 255, 0)  # cor do contorno da barra
 
@@ -40,7 +40,13 @@ def sign(num):
         return 0
 
 class Body:
-    def __init__(self, body, pos_x=None, pos_y=None, vel_x=.0, vel_y=.0, atrito=.0):
+    obj_idx = 0
+    def __init__(self, body, pos_x=None, pos_y=None, vel_x=.0, vel_y=.0, name=None, atrito=.0):
+        Body.obj_idx += 1
+        if name is None:
+            self.name = 'Body_' + str(Body.obj_idx)
+        else:
+            self.name = name
         self.body = body
         self.pos_x_0 = pos_x
         self.pos_y_0 = pos_y
@@ -65,45 +71,59 @@ class Body:
         self.vel_modulo = math.sqrt(self.vel_x**2 + self.vel_y**2)
         self.vel_angulo = math.atan2(self.vel_y, self.vel_x)
     def update(self, dt=1):
-        self.pos_x = self.pos_x + self.vel_x * dt
-        self.pos_y = self.pos_y + self.vel_y * dt
-        self.body.move(self.vel_x * dt, self.vel_y * dt)
+        dx = self.vel_x * dt
+        dy = self.vel_y * dt
+        self.pos_x += dx
+        self.pos_y += dy
+        self.body.move(dx, dy)
         for idx, obst in enumerate(self.obstacles):
             em_contato = self.collide(obst, self.nao_colidiu[idx])
             self.nao_colidiu[idx] = not em_contato
     def add_obstacle(self, corpo):
         self.obstacles.append(corpo)
         self.nao_colidiu.append(True)
-    def is_in_collision_zone(self, corpo):
+    def is_in_collision_zone(self, corpo):  # retorna True caso corpo esteja em distancia de colisao. Nao significa que os objetos estejam em contato
         p_colisao_x = corpo.pos_x - self.pos_x
         p_colisao_y = corpo.pos_y - self.pos_y
         distancia = math.sqrt(p_colisao_x**2 + p_colisao_y**2)
         if distancia > corpo.radius + self.radius:
             return False
         return True
-    def collide(self, obstacle, modify):  # retorna True caso o objeto esteja em contato com o obstaculo
+    def collide(self, obstacle, modify, verbose=False):  # retorna True caso o objeto esteja em contato com o obstaculo
         angulo_normal = obstacle.get_normal_angle(self)
-        if angulo_normal is None:
+        if angulo_normal is None:  # objeto nao esta em contato com obstaculo
             return False
         if modify:
-            print("###  NOVA COLISAO  ###")
-            print("Velocidade do projetil:")
-            print("\tCart.: (%.2f, \t%.2f)" % (self.vel_x, self.vel_y))
-            print("\tPolar: (%.2f, \t%.1f)" % (self.vel_modulo, self.vel_angulo / math.tau * 360))
-            print("Velocidade do obstaculo:")
-            print("\tCart.: (%.2f, \t%.2f)" % (obstacle.vel_x, obstacle.vel_y))
-            print("Angulo normal: %.1f" % (angulo_normal / math.tau * 360))
-            novo_angulo = math.pi + 2*angulo_normal - self.vel_angulo  # == math.pi - (self.vel_angulo - angulo_normal) + angulo_normal
-            print("Novo angulo do projetil: %.1f" % (novo_angulo / math.tau * 360))
-            print()
-            # dv_x = obstacle.vel_x - self.vel_x
-            # dv_y = obstacle.vel_y - self.vel_y
-            self.vel_x = self.vel_modulo * math.cos(novo_angulo)
-            self.vel_y = self.vel_modulo * math.sin(novo_angulo)
-            self.vel_x += obstacle.vel_x * ((1-obstacle.atrito) * math.fabs(math.cos(angulo_normal)) + obstacle.atrito)
-            self.vel_y += obstacle.vel_y * ((1-obstacle.atrito) * math.fabs(math.sin(angulo_normal)) + obstacle.atrito)
-            self.vel_modulo = math.sqrt(self.vel_x**2 + self.vel_y**2)
-            self.vel_angulo = math.atan2(self.vel_y, self.vel_x)
+            vel_proj_norm = self.vel_modulo * math.cos(self.vel_angulo - angulo_normal)
+            vel_proj_perp = self.vel_modulo * math.sin(self.vel_angulo - angulo_normal)
+            vel_obst_norm = obstacle.vel_modulo * math.cos(obstacle.vel_angulo - angulo_normal)
+            vel_obst_perp = obstacle.vel_modulo * math.sin(obstacle.vel_angulo - angulo_normal)
+            vel_diff_norm = vel_proj_norm - vel_obst_norm
+            vel_diff_perp = vel_proj_perp - vel_obst_perp
+            nova_vel_diff_norm = -vel_diff_norm
+            nova_vel_diff_perp = vel_diff_perp * (1 - obstacle.atrito)
+            nova_vel_proj_norm = nova_vel_diff_norm + vel_obst_norm
+            nova_vel_proj_perp = nova_vel_diff_perp + vel_obst_perp
+            if verbose:
+                print("Evento: colisao")
+                print("\tProjetil:", self.name)
+                print("\tObstaculo:", obstacle.name)
+                print("\tangulo_normal = %d" % int(angulo_normal / math.tau * 360))
+                print("\tvel_proj_norm = %.2f" % vel_proj_norm)
+                print("\tvel_obst_norm = %.2f" % vel_obst_norm)
+                print("\tvel_diff_norm = %.2f" % vel_diff_norm)
+                print("\tnova_vel_diff_norm = %.2f" % nova_vel_diff_norm)
+                print("\tnova_vel_proj_norm = %.2f" % nova_vel_proj_norm)
+                print("\tvel_proj_perp = %.2f" % vel_proj_perp)
+                print("\tvel_obst_perp = %.2f" % vel_obst_perp)
+                print("\tvel_diff_perp = %.2f" % vel_diff_perp)
+                print("\tnova_vel_diff_perp = %.2f" % nova_vel_diff_perp)
+                print("\tnova_vel_proj_perp = %.2f" % nova_vel_proj_perp)
+                print()
+            self.vel_modulo = math.sqrt(nova_vel_proj_norm**2 + nova_vel_proj_perp**2)
+            self.vel_angulo = math.atan2(nova_vel_proj_perp, nova_vel_proj_norm) + angulo_normal
+            self.vel_x = self.vel_modulo * math.cos(self.vel_angulo)
+            self.vel_y = self.vel_modulo * math.sin(self.vel_angulo)
         return True
     def random_collide(self, obstacle, modify, mean=.0, std=math.tau/32):
         angulo_normal = obstacle.get_normal_angle(self)
@@ -134,23 +154,31 @@ class Body:
         self.body.setWidth(width)
 
 class Ball(Body):
-    def __init__(self, centro, raio, vel_x=.0, vel_y=.0):
+    obj_idx = 0
+    def __init__(self, centro, raio, vel_x=.0, vel_y=.0, name=None):
+        Ball.obj_idx += 1
+        if name is None:
+            name = 'Ball_' + str(Ball.obj_idx)
         self.radius = raio
-        Body.__init__(self, Circle(centro, raio), centro.getX(), centro.getY(), vel_x, vel_y)
+        Body.__init__(self, Circle(centro, raio), centro.getX(), centro.getY(), vel_x, vel_y, name=name)
     def get_normal_angle(self, projetil):
         if self.is_in_collision_zone(projetil):
             return math.atan2(projetil.pos_y - self.pos_y, projetil.pos_x - self.pos_x)
         return None
 
 class RegularPolygon(Body):
-    def __init__(self, centro, raio, n_lados, angulo=.0, vel_x=.0, vel_y=.0):
+    obj_idx = 0
+    def __init__(self, centro, raio, n_lados, angulo=.0, vel_x=.0, vel_y=.0, name=None):
+        RegularPolygon.obj_idx += 1
+        if name is None:
+            name = 'Poly_' + str(RegularPolygon.obj_idx)
         self.radius = raio
         self.n_lados = n_lados
         self.angle = angulo % (math.tau / n_lados)
         self.vertices = [Point(centro.getX() + raio * math.cos(self.angle + i * math.tau / n_lados),
                                centro.getY() + raio * math.sin(self.angle + i * math.tau / n_lados)) for i in range(n_lados)]
         poly = Polygon(self.vertices)
-        Body.__init__(self, poly, centro.getX(), centro.getY(), vel_x, vel_y)
+        Body.__init__(self, poly, centro.getX(), centro.getY(), vel_x, vel_y, name=name)
     def get_normal_angle(self, projetil):
         if not self.is_in_collision_zone(projetil):
             return None
@@ -169,14 +197,18 @@ class RegularPolygon(Body):
         # return angulo // angulo_entre_vertices * angulo_entre_vertices + angulo_entre_vertices / 2
 
 class Bar(Body):
-    def __init__(self, p1, p2, passo, atrito, vel_x_0=.0):
+    obj_idx = 0
+    def __init__(self, p1, p2, passo, atrito, vel_x_0=.0, name=None):
+        Bar.obj_idx += 1
+        if name is None:
+            name = 'Bar_' + str(Bar.obj_idx)
         pos_x = (p1.getX() + p2.getX()) / 2
         pos_y = (p1.getY() + p2.getY()) / 2
         self.height = math.fabs(p2.getY() - p1.getY())
         self.length = math.fabs(p2.getX() - p1.getX())
         self.radius = math.sqrt((p2.getX() - p1.getX())**2 + (p2.getY() - p1.getY())**2) / 2
         self.normal_angle = math.tau / 4
-        Body.__init__(self, Rectangle(p1, p2), pos_x, pos_y, vel_x_0, .0, atrito)
+        Body.__init__(self, Rectangle(p1, p2), pos_x, pos_y, vel_x_0, .0, name=name, atrito=atrito)
     def get_normal_angle(self, projetil):
         if not self.is_in_collision_zone(projetil):
             return None
@@ -186,12 +218,16 @@ class Bar(Body):
         return self.normal_angle
 
 class Wall(Body):
-    def __init__(self, p1, p2):
+    obj_idx = 0
+    def __init__(self, p1, p2, name=None):
+        Wall.obj_idx += 1
+        if name is None:
+            name = 'Wall_' + str(Wall.obj_idx)
         pos_x = (p2.getX() + p1.getX()) / 2
         pos_y = (p2.getY() + p1.getY()) / 2
         self.radius = math.sqrt((p2.getX() - p1.getX())**2 + (p2.getY() - p1.getY())**2) / 2
         self.normal_angle = math.atan2(p2.getY() - p1.getY(), p2.getX() - p1.getX()) + math.tau / 4
-        Body.__init__(self, Line(p1, p2), pos_x, pos_y)
+        Body.__init__(self, Line(p1, p2), pos_x, pos_y, name=name)
     def get_normal_angle(self, projetil):
         p1 = self.body.getP1()
         p2 = self.body.getP2()
@@ -211,19 +247,19 @@ class Wall(Body):
 win = GraphWin("Bolinha com Esteroides", width, height)
 win.setCoords(0, 0, width, height)
 
-linhaSuperior = Wall(Point(dl, height - du), Point(width - dr, height - du))
+linhaSuperior = Wall(Point(dl, height - du), Point(width - dr, height - du), name="Parede_sup")
 linhaSuperior.setWidth(10)
 linhaSuperior.setFill(color_rgb(10, 100, 10))
 
-linhaInferior = Wall(Point(dl, dd), Point(width - dr, dd))
+linhaInferior = Wall(Point(dl, dd), Point(width - dr, dd), name="Parede_inf")
 linhaInferior.setWidth(10)
 linhaInferior.setFill(color_rgb(10, 100, 10))
 
-linhaEsquerda = Wall(Point(dl, dd), Point(dl, height - du))
+linhaEsquerda = Wall(Point(dl, dd), Point(dl, height - du), name="Parede_esq")
 linhaEsquerda.setWidth(10)
 linhaEsquerda.setFill(color_rgb(10, 100, 10))
 
-linhaDireita = Wall(Point(width - dr, dd), Point(width - dr, height - du))
+linhaDireita = Wall(Point(width - dr, dd), Point(width - dr, height - du), name="Parede_dir")
 linhaDireita.setWidth(10)
 linhaDireita.setFill(color_rgb(10, 100, 10))
 
@@ -242,7 +278,7 @@ def atualiza_texto():
 # barra
 barra = Bar(Point(width/2 - comprimento_barra/2, dd + db + espessura_barra/2),
             Point(width/2 + comprimento_barra/2, dd + db - espessura_barra/2),
-            velocidade_barra, atrito_barra)
+            velocidade_barra, atrito=atrito_barra)
 barra.setFill(fill_barra)
 barra.setOutline(outline_barra)
 barra.setWidth(2)
@@ -250,7 +286,7 @@ barra.add_obstacle(linhaEsquerda)
 barra.add_obstacle(linhaDireita)
 
 # bolinha
-bola = Ball(Point(width/2, height/2), raio_bola, vel_y=vel_inicial)
+bola = Ball(Point(width/2, height/2), raio_bola, vel_y=vel_inicial, name="Bolinha")
 bola.setFill(fill_bola)
 bola.setOutline(outline_bola)
 bola.setWidth(2)
@@ -354,10 +390,16 @@ for temp in range(1):
         tecla = win.checkKey()
         if (tecla == "Right" or tecla == 'd'):
             barra.vel_x = velocidade_barra
+            barra.vel_modulo = velocidade_barra
+            barra.vel_angulo = 0
         if (tecla == "Left" or tecla == 'a'):
             barra.vel_x = -velocidade_barra
+            barra.vel_modulo = velocidade_barra
+            barra.vel_angulo = math.pi
         if (tecla == ''):
             barra.vel_x = 0
+            barra.vel_modulo = 0
+            barra.vel_angulo = 0
         if tecla == "Escape":  # sai do jogo
             game_over()
             break
