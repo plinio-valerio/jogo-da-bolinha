@@ -59,7 +59,8 @@ class Body:
         self.vel_y = vel_y
         self.vel_modulo = math.sqrt(self.vel_x**2 + self.vel_y**2)
         self.vel_angulo = math.atan2(self.vel_y, self.vel_x)
-        self.vidas = vidas
+        self.vidas_iniciais = vidas
+        self.vidas = self.vidas_iniciais
         self.kill = kill
         if radius is not None:
             self.radius = radius
@@ -288,6 +289,8 @@ class Wall(Body):
 win = GraphWin("Bolinha com Esteroides", width, height)
 win.setCoords(0, 0, width, height)
 
+tilt = 15
+
 linhaSuperior = Wall(Point(dl, height - du), Point(width - dr, height - du), name="Parede_sup")
 linhaSuperior.setWidth(10)
 linhaSuperior.setFill(color_rgb(10, 100, 10))
@@ -296,11 +299,11 @@ linhaInferior = Wall(Point(dl, dd), Point(width - dr, dd), name="Parede_inf", ki
 linhaInferior.setWidth(10)
 linhaInferior.setFill(color_rgb(10, 100, 10))
 
-linhaEsquerda = Wall(Point(dl, dd), Point(dl, height - du), name="Parede_esq")
+linhaEsquerda = Wall(Point(dl - tilt, dd), Point(dl + tilt, height - du), name="Parede_esq")
 linhaEsquerda.setWidth(10)
 linhaEsquerda.setFill(color_rgb(10, 100, 10))
 
-linhaDireita = Wall(Point(width - dr, dd), Point(width - dr, height - du), name="Parede_dir")
+linhaDireita = Wall(Point(width - dr + tilt, dd), Point(width - dr - tilt, height - du), name="Parede_dir")
 linhaDireita.setWidth(10)
 linhaDireita.setFill(color_rgb(10, 100, 10))
 
@@ -319,19 +322,12 @@ barra = Bar(Point(width/2 - comprimento_barra/2, dd + db + espessura_barra/2),
 barra.setFill(fill_barra)
 barra.setOutline(outline_barra)
 barra.setWidth(2)
-barra.add_obstacle(linhaEsquerda)
-barra.add_obstacle(linhaDireita)
 
 # bolinha
 bola = Ball(Point(width/2, height/2), raio_bola, vel_y=vel_inicial, vidas=vidas_iniciais, name="Bolinha")
 bola.setFill(fill_bola)
 bola.setOutline(outline_bola)
 bola.setWidth(2)
-bola.add_obstacle(linhaSuperior)
-bola.add_obstacle(linhaInferior)
-bola.add_obstacle(linhaEsquerda)
-bola.add_obstacle(linhaDireita)
-bola.add_obstacle(barra)
 
 # menu
 while True:
@@ -354,11 +350,20 @@ while True:
     espaco_branco.draw(win)
     bola.draw(win)
     barra.draw(win)
+    barra.reset()
+    barra.add_obstacle(linhaEsquerda)
+    barra.add_obstacle(linhaDireita)
+    bola.reset()
+    bola.add_obstacle(linhaSuperior)
+    bola.add_obstacle(linhaInferior)
+    bola.add_obstacle(linhaEsquerda)
+    bola.add_obstacle(linhaDireita)
+    bola.add_obstacle(barra)
     obstaculos = []
     for i in range(n_obstaculos):  # cria obstaculos
         radius = random.random() * 25 + 25
         center = Point((width - dr - dl - 3*radius) * random.random() + dl + 1.5*radius,
-                       (height - du - dd - db - 2*radius) / 3 * random.random() + 2 * (height - du - dd - db) / 3 + dd + db)
+                       (height - du - dd - db - 3*radius) / 3 * random.random() + 2 * (height - du - dd - db - 3*radius) / 3 + dd + db + 1.5 * radius)
         vel_x = random.gauss(0, 2)
         if random.random() < 1.0:  # probabilidade de obstaculo ser um circulo
             obst = Ball(center, radius, vel_x=vel_x)
@@ -373,12 +378,16 @@ while True:
         obst.setOutline(color_rgb((color_r + 128) % 256, (color_g + 128) % 256, (color_b + 128) % 256))
         obst.setWidth(2)
         obst.draw(win)
+        # obst.add_obstacle(bola)
+        obst.add_obstacle(linhaSuperior)
+        obst.add_obstacle(linhaInferior)
         obst.add_obstacle(linhaEsquerda)
         obst.add_obstacle(linhaDireita)
         bola.add_obstacle(obst)
         obstaculos.append(obst)
-    barra.reset()
-    bola.reset()
+    for obst in obstaculos:
+        for obst_2 in obstaculos:
+            obst.add_obstacle(obst_2)
     time.sleep(1)
 
     t_steps = 0
@@ -386,15 +395,15 @@ while True:
     while True:
         # movimento horizontal da barra pelas setas direita/esquerda
         tecla = win.checkKey()
-        if (tecla == "Right" or tecla == 'd'):
+        if (tecla == "Right" or tecla == 'd') and barra.pos_x < width - dr - comprimento_barra/2:
             barra.vel_x = velocidade_barra
             barra.vel_modulo = velocidade_barra
             barra.vel_angulo = 0
-        if (tecla == "Left" or tecla == 'a'):
+        if (tecla == "Left" or tecla == 'a') and barra.pos_x > dl + comprimento_barra/2:
             barra.vel_x = -velocidade_barra
             barra.vel_modulo = velocidade_barra
             barra.vel_angulo = math.pi
-        if (tecla == ''):
+        if (tecla == '') or barra.pos_x >= width - dr - comprimento_barra/2 and barra.vel_x > 0 or barra.pos_x <= dl + comprimento_barra/2 and barra.vel_x < 0:
             barra.vel_x = 0
             barra.vel_modulo = 0
             barra.vel_angulo = 0
@@ -420,6 +429,11 @@ while True:
             linhaDireita.undraw()
             for obst in obstaculos:
                 obst.undraw()
+                del obst
+            bola.vidas = vidas_iniciais
+            bola.obstacles = []
+            bola.nao_colidiu = []
+            bola.n_colisoes = 0
             espaco_branco.undraw()
             bola.undraw()
             barra.undraw()
