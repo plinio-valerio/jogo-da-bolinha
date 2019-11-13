@@ -385,9 +385,9 @@ while True:
         obst.add_obstacle(linhaDireita)
         bola.add_obstacle(obst)
         obstaculos.append(obst)
-    for obst in obstaculos:
-        for obst_2 in obstaculos:
-            obst.add_obstacle(obst_2)
+#     for obst in obstaculos:
+#         for obst_2 in obstaculos:
+#             obst.add_obstacle(obst_2)
     time.sleep(1)
 
     t_steps = 0
