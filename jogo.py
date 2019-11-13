@@ -59,6 +59,10 @@ class Body:
         self.vel_y = vel_y
         self.vel_modulo = math.sqrt(self.vel_x**2 + self.vel_y**2)
         self.vel_angulo = math.atan2(self.vel_y, self.vel_x)
+        self.next_vel_x = vel_x
+        self.next_vel_y = vel_y
+        self.next_vel_modulo = self.vel_modulo
+        self.next_vel_angulo = self.vel_angulo
         self.vidas_iniciais = vidas
         self.vidas = self.vidas_iniciais
         self.kill = kill
@@ -77,7 +81,15 @@ class Body:
         self.vel_y = self.vel_y_0
         self.vel_modulo = math.sqrt(self.vel_x**2 + self.vel_y**2)
         self.vel_angulo = math.atan2(self.vel_y, self.vel_x)
+        self.next_vel_x = self.vel_x
+        self.next_vel_y = self.vel_y
+        self.next_vel_modulo = self.vel_modulo
+        self.next_vel_angulo = self.vel_angulo
     def update(self, dt=1):
+        self.vel_x = self.next_vel_x
+        self.vel_y = self.next_vel_y
+        self.vel_modulo = self.next_vel_modulo
+        self.vel_angulo = self.next_vel_angulo
         dx = self.vel_x * dt
         dy = self.vel_y * dt
         self.pos_x += dx
@@ -127,10 +139,10 @@ class Body:
                 print("\tnova_vel_diff_perp = %.2f" % nova_vel_diff_perp)
                 print("\tnova_vel_proj_perp = %.2f" % nova_vel_proj_perp)
                 print()
-            self.vel_modulo = math.sqrt(nova_vel_proj_norm**2 + nova_vel_proj_perp**2)
-            self.vel_angulo = math.atan2(nova_vel_proj_perp, nova_vel_proj_norm) + angulo_normal
-            self.vel_x = self.vel_modulo * math.cos(self.vel_angulo)
-            self.vel_y = self.vel_modulo * math.sin(self.vel_angulo)
+            self.next_vel_modulo = math.sqrt(nova_vel_proj_norm**2 + nova_vel_proj_perp**2)
+            self.next_vel_angulo = math.atan2(nova_vel_proj_perp, nova_vel_proj_norm) + angulo_normal
+            self.next_vel_x = self.next_vel_modulo * math.cos(self.next_vel_angulo)
+            self.next_vel_y = self.next_vel_modulo * math.sin(self.next_vel_angulo)
             self.n_colisoes += 1
             obstacle.on_collision(self)
         return True
@@ -141,12 +153,12 @@ class Body:
         if modify:
             self.collide(obstacle, modify)
             incremento_aleatorio = random.gauss(mean, std)
-            novo_angulo = self.vel_angulo + incremento_aleatorio
-            if math.sin(novo_angulo - angulo_normal) * math.sin(self.vel_angulo - angulo_normal) >= 0 and \
-              math.cos(novo_angulo - angulo_normal) * math.cos(self.vel_angulo - angulo_normal) >= 0:
-                self.vel_angulo = novo_angulo
-                self.vel_x = self.vel_modulo * math.cos(self.vel_angulo)
-                self.vel_y = self.vel_modulo * math.sin(self.vel_angulo)
+            novo_angulo = self.next_vel_angulo + incremento_aleatorio
+            if math.sin(novo_angulo - angulo_normal) * math.sin(self.next_vel_angulo - angulo_normal) >= 0 and \
+              math.cos(novo_angulo - angulo_normal) * math.cos(self.next_vel_angulo - angulo_normal) >= 0:
+                self.next_vel_angulo = novo_angulo
+                self.next_vel_x = self.next_vel_modulo * math.cos(self.next_vel_angulo)
+                self.next_vel_y = self.next_vel_modulo * math.sin(self.next_vel_angulo)
         return True
     def on_collision(self, projetil):
         if self.kill:
@@ -385,9 +397,9 @@ while True:
         obst.add_obstacle(linhaDireita)
         bola.add_obstacle(obst)
         obstaculos.append(obst)
-#     for obst in obstaculos:
-#         for obst_2 in obstaculos:
-#             obst.add_obstacle(obst_2)
+    # for obst in obstaculos:
+    #     for obst_2 in obstaculos:
+    #         obst.add_obstacle(obst_2)
     time.sleep(1)
 
     t_steps = 0
@@ -396,17 +408,17 @@ while True:
         # movimento horizontal da barra pelas setas direita/esquerda
         tecla = win.checkKey()
         if (tecla == "Right" or tecla == 'd') and barra.pos_x < width - dr - comprimento_barra/2:
-            barra.vel_x = velocidade_barra
-            barra.vel_modulo = velocidade_barra
-            barra.vel_angulo = 0
+            barra.next_vel_x = velocidade_barra
+            barra.next_vel_modulo = velocidade_barra
+            barra.next_vel_angulo = 0
         if (tecla == "Left" or tecla == 'a') and barra.pos_x > dl + comprimento_barra/2:
-            barra.vel_x = -velocidade_barra
-            barra.vel_modulo = velocidade_barra
-            barra.vel_angulo = math.pi
+            barra.next_vel_x = -velocidade_barra
+            barra.next_vel_modulo = velocidade_barra
+            barra.next_vel_angulo = math.pi
         if (tecla == '') or barra.pos_x >= width - dr - comprimento_barra/2 and barra.vel_x > 0 or barra.pos_x <= dl + comprimento_barra/2 and barra.vel_x < 0:
-            barra.vel_x = 0
-            barra.vel_modulo = 0
-            barra.vel_angulo = 0
+            barra.next_vel_x = 0
+            barra.next_vel_modulo = 0
+            barra.next_vel_angulo = 0
         if tecla == "Escape":  # sai do jogo
             bola.vidas = -1
 
