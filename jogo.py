@@ -42,7 +42,7 @@ def sign(num):
 
 class Body:
     obj_idx = 0
-    def __init__(self, body, pos_x=None, pos_y=None, vel_x=.0, vel_y=.0, vidas=3, name=None, radius=None, kill=False, atrito=.0):
+    def __init__(self, body, pos_x=None, pos_y=None, vel_x=.0, vel_y=.0, vidas=3, mass=None, name=None, radius=None, kill=False, atrito=.0):
         Body.obj_idx += 1
         if name is None:
             self.name = 'Body_' + str(Body.obj_idx)
@@ -66,6 +66,10 @@ class Body:
         self.vidas_iniciais = vidas
         self.vidas = self.vidas_iniciais
         self.kill = kill
+        if mass is None:
+            self.mass = self.getArea()
+        else:
+            self.mass = mass
         if radius is not None:
             self.radius = radius
         self.atrito = atrito
@@ -160,14 +164,16 @@ class Body:
                 self.next_vel_x = self.next_vel_modulo * math.cos(self.next_vel_angulo)
                 self.next_vel_y = self.next_vel_modulo * math.sin(self.next_vel_angulo)
         return True
+    def getArea(self):
+        raise NotImplementedError
+    def get_normal_angle(self, corpo):
+        raise NotImplementedError
     def on_collision(self, projetil):
         if self.kill:
             projetil.vidas -= 1
             projetil.on_death()
     def on_death(self):
         self.reset()
-    def get_normal_angle(self, corpo):
-        raise NotImplementedError
     def draw(self, win):
         self.body.draw(win)
     def undraw(self):
@@ -193,6 +199,9 @@ class Ball(Body):
         if self.is_in_collision_zone(projetil):
             return math.atan2(projetil.pos_y - self.pos_y, projetil.pos_x - self.pos_x)
         return None
+    def getArea(self):
+        return math.pi * self.radius**2
+
 
 class RegularPolygon(Body):
     obj_idx = 0
@@ -242,6 +251,11 @@ class RegularPolygon(Body):
         # angulo_entre_vertices = math.tau / self.n_lados
         # angulo = math.atan2(y, x) - self.angle
         # return angulo // angulo_entre_vertices * angulo_entre_vertices + angulo_entre_vertices / 2
+    def getArea(self):
+        angulo_entre_vertices = math.tau / self.n_lados
+        meia_base_triangulo = self.radius * math.sin(angulo_entre_vertices / 2)
+        altura_triangulo = self.radius * math.cos(angulo_entre_vertices / 2)
+        return self.n_lados * meia_base_triangulo * altura_triangulo
 
 class Bar(Body):
     obj_idx = 0
@@ -255,7 +269,7 @@ class Bar(Body):
         self.length = math.fabs(p2.getX() - p1.getX())
         self.radius = math.sqrt((p2.getX() - p1.getX())**2 + (p2.getY() - p1.getY())**2) / 2
         self.normal_angle = math.tau / 4
-        Body.__init__(self, Rectangle(p1, p2), pos_x, pos_y, vel_x_0, .0, name=name, atrito=atrito, kill=kill)
+        Body.__init__(self, Rectangle(p1, p2), pos_x, pos_y, vel_x_0, .0, name=name, mass=math.inf, atrito=atrito, kill=kill)
     def get_normal_angle(self, projetil):
         if not self.is_in_collision_zone(projetil):
             return None
@@ -263,6 +277,8 @@ class Bar(Body):
         if distancia_bola_para_aresta > projetil.radius:
             return None
         return self.normal_angle
+    def getArea(self):
+        return self.height * self.width
 
 class Wall(Body):
     obj_idx = 0
@@ -274,7 +290,7 @@ class Wall(Body):
         pos_y = (p2.getY() + p1.getY()) / 2
         self.radius = math.sqrt((p2.getX() - p1.getX())**2 + (p2.getY() - p1.getY())**2) / 2
         self.normal_angle = math.atan2(p2.getY() - p1.getY(), p2.getX() - p1.getX()) + math.tau / 4
-        Body.__init__(self, Line(p1, p2), pos_x, pos_y, name=name, kill=kill)
+        Body.__init__(self, Line(p1, p2), pos_x, pos_y, name=name, mass=math.inf, kill=kill)
     def get_normal_angle(self, projetil):
         p1 = self.body.getP1()
         p2 = self.body.getP2()
@@ -301,7 +317,7 @@ class Wall(Body):
 win = GraphWin("Bolinha com Esteroides", width, height)
 win.setCoords(0, 0, width, height)
 
-tilt = 15
+tilt = 0
 
 linhaSuperior = Wall(Point(dl, height - du), Point(width - dr, height - du), name="Parede_sup")
 linhaSuperior.setWidth(10)
