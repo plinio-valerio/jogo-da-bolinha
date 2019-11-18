@@ -42,7 +42,7 @@ linhaSuperior = Wall(Point(dl + tilt, height - du), Point(width - dr - tilt, hei
 linhaSuperior.setWidth(10)
 linhaSuperior.setFill(color_rgb(10, 100, 10))
 
-linhaInferior = Wall(Point(dl - tilt, dd), Point(width - dr + tilt, dd), name="Parede_inf", kill=True)
+linhaInferior = Wall(Point(dl - tilt, dd), Point(width - dr + tilt, dd), name="Parede_inf")
 linhaInferior.setWidth(10)
 linhaInferior.setFill(color_rgb(10, 100, 10))
 
@@ -64,8 +64,7 @@ info_txt.setSize(14)
 
 # barra
 barra = Bar(Point(width/2 - comprimento_barra/2, dd + db + espessura_barra/2),
-            Point(width/2 + comprimento_barra/2, dd + db - espessura_barra/2),
-            velocidade_barra)
+            Point(width/2 + comprimento_barra/2, dd + db - espessura_barra/2))
 barra.setFill(fill_barra)
 barra.setOutline(outline_barra)
 barra.setWidth(2)
@@ -101,14 +100,15 @@ while True:
     linhaDireita.draw(win)
     espaco_branco.draw(win)
     barra.reset()
-    barra.add_obstacle(linhaEsquerda)
-    barra.add_obstacle(linhaDireita)
+    # barra.add_obstacle(linhaEsquerda)
+    # barra.add_obstacle(linhaDireita)
     bola.reset()
     bola.add_obstacle(linhaSuperior)
     bola.add_obstacle(linhaInferior)
     bola.add_obstacle(linhaEsquerda)
     bola.add_obstacle(linhaDireita)
     bola.add_obstacle(barra)
+    bola.add_reaper(linhaInferior)
     obstaculos = []
     for i in range(n_obstaculos):  # cria obstaculos
         radius = random.random() * 30 + 30
@@ -117,25 +117,26 @@ while True:
         if random.random() < 0.5:  # probabilidade de obstaculo ser um circulo
             vel_x = random.gauss(0, 100)
             vel_y = random.gauss(0, 50)
-            obst = Ball(center, radius, vel_x=vel_x, vel_y=vel_y)
+            obst = Ball(center, radius, vel_x=vel_x, vel_y=vel_y, lives=3)
+            obst.add_obstacle(linhaSuperior)
+            obst.add_obstacle(linhaInferior)
+            obst.add_obstacle(linhaEsquerda)
+            obst.add_obstacle(linhaDireita)
+            for obst_2 in obstaculos:
+                obst.add_obstacle(obst_2)
         else:
             n_lados = random.randint(3, 8)
             angulo = random.random() * math.tau / n_lados
-            obst = RegularPolygon(center, radius, n_lados, angulo)
+            obst = RegularPolygon(center, radius, n_lados, angulo, lives=3)
         color_r = random.randrange(0, 256)
         color_g = random.randrange(0, 256)
         color_b = random.randrange(0, 256)
         obst.setFill(color_rgb(color_r, color_g, color_b))
         obst.setOutline(color_rgb((color_r + 128) % 256, (color_g + 128) % 256, (color_b + 128) % 256))
         obst.setWidth(2)
+        bola.add_obstacle(obst)
+        obst.add_reaper(bola)
         obst.draw(win)
-        obst.add_obstacle(bola)
-        obst.add_obstacle(linhaSuperior)
-        obst.add_obstacle(linhaInferior)
-        obst.add_obstacle(linhaEsquerda)
-        obst.add_obstacle(linhaDireita)
-        for obst_2 in obstaculos:
-            obst.add_obstacle(obst_2)
         obstaculos.append(obst)
     bola.draw(win)
     barra.draw(win)
