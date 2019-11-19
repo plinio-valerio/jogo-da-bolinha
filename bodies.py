@@ -17,6 +17,10 @@ class Body:
     def __init__(self, body, mass, pos, vel, name=None, lives=None):
         assert mass >= .0
         assert lives is None or isinstance(lives, int) and lives > 0
+        self.pos = np.array(pos, dtype=np.float64)
+        assert self.pos.ndim == 1 and self.pos.size == 2
+        self.vel = np.array(vel, dtype=np.float64)
+        assert self.vel.ndim == 1 and self.vel.size == 2
         Body.obj_idx += 1
         self.repr = 'Body_' + str(Body.obj_idx)
         if name is None:
@@ -25,9 +29,7 @@ class Body:
             self.name = name
         self.body = body
         self.mass = float(mass)
-        self.pos = np.array(pos, dtype=np.float64)
         self.pos_0 = self.pos.copy()
-        self.vel = np.array(vel, dtype=np.float64)
         self.vel_0 = self.vel.copy()
         self.lives = lives
         self.width = 1
@@ -89,7 +91,9 @@ class Ball(Body):  # only moving body
         assert radius > .0
         assert mass is None or mass >= .0
         center = np.array(center, dtype=np.float64)
+        assert center.ndim == 1 and center.size == 2
         vel = np.array(vel, dtype=np.float64)
+        assert vel.ndim == 1 and vel.size == 2
         Ball.obj_idx += 1
         if name is None:
             name = 'Ball_' + str(Ball.obj_idx)
@@ -233,12 +237,13 @@ class PunyBall(Ball):
 class StaticBody(Body):
     obj_idx = 0
     def __init__(self, body, pos, name=None, lives=None):
+        pos = np.array(pos, dtype=np.float64)
+        assert pos.ndim == 1 and pos.size == 2
         StaticBody.obj_idx += 1
         if name is None:
             name = "PunyBall_" + str(StaticBody.obj_idx)
-        pos = np.array(pos, dtype=np.float64)
         super().__init__(body=body, mass=math.inf, pos=pos, vel=(.0,.0), name=name, lives=lives)
-    def update(self):
+    def update(self, dt=1.0):
         pass
 
 class RegularPolygon(StaticBody):
@@ -247,6 +252,7 @@ class RegularPolygon(StaticBody):
         assert radius > .0
         assert n_edges >= 3
         center = np.array(center, dtype=np.float64)
+        assert center.ndim == 1 and center.size == 2
         RegularPolygon.obj_idx += 1
         if name is None:
             name = 'Poly_' + str(RegularPolygon.obj_idx)
@@ -281,7 +287,9 @@ class Wall(StaticBody):
     obj_idx = 0
     def __init__(self, p1, p2, name=None, lives=None):
         self.p1 = np.array(p1, dtype=np.float64)
+        assert self.p1.ndim == 1 and self.p1.size == 2
         self.p2 = np.array(p2, dtype=np.float64)
+        assert self.p2.ndim == 1 and self.p2.size == 2
         Wall.obj_idx += 1
         if name is None:
             name = 'Wall_' + str(Wall.obj_idx)
@@ -289,7 +297,7 @@ class Wall(StaticBody):
         normal_vector = np.dot(rotation_matrix(math.tau/4), self.p2 - center)
         self.normal_angle = math.atan2(normal_vector[1], normal_vector[0])
         self.length = np.linalg.norm(self.p2 - self.p1)
-        super().__init__(body=Line(p1, p2), pos=center, name=name, lives=lives)
+        super().__init__(body=Line(Point(self.p1[0], self.p1[1]), Point(self.p2[0], self.p2[1])), pos=center, name=name, lives=lives)
     def get_normal_angle(self, projectile):
         assert isinstance(projectile, Ball)
         relative_position = np.dot(rotation_matrix(-self.normal_angle), projectile.pos - self.pos)
@@ -306,17 +314,19 @@ class Wall(StaticBody):
 class Bar(Body):
     obj_idx = 0
     def __init__(self, p1, p2, name=None):
-        assert isinstance(p1, Point)
-        assert isinstance(p2, Point)
+        self.p1 = np.array(p1, dtype=np.float64)
+        assert self.p1.ndim == 1 and self.p1.size == 2
+        self.p2 = np.array(p2, dtype=np.float64)
+        assert self.p2.ndim == 1 and self.p2.size == 2
         Bar.obj_idx += 1
         if name is None:
             name = 'Bar_' + str(Bar.obj_idx)
-        pos_x = (p1.getX() + p2.getX()) / 2
-        pos_y = (p1.getY() + p2.getY()) / 2
-        self.height = math.fabs(p2.getY() - p1.getY())
-        self.length = math.fabs(p2.getX() - p1.getX())
+        center = (self.p1 + self.p2) / 2
+        bar_shape = self.p2 - self.p1
+        self.length = math.fabs(bar_shape[0])
+        self.height = math.fabs(bar_shape[1])
         self.vel = np.array([.0, .0], dtype=np.float64)
-        super().__init__(body=Rectangle(p1, p2), mass=math.inf, pos_x=pos_x, pos_y=pos_y, name=name)
+        super().__init__(body=Rectangle(Point(self.p1[0], self.p1[1]), Point(self.p2[0], self.p2[1])), mass=math.inf, pos=center, vel=(.0,.0), name=name)
     def reset(self):
         delta = self.pos_0 - self.pos
         self.body.move(delta[0], delta[1])

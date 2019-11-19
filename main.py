@@ -38,19 +38,19 @@ win.setCoords(0, 0, width, height)
 
 tilt = 0
 
-linhaSuperior = Wall(Point(dl + tilt, height - du), Point(width - dr - tilt, height - du), name="Parede_sup")
+linhaSuperior = Wall((dl + tilt, height - du), (width - dr - tilt, height - du), name="Parede_sup")
 linhaSuperior.setWidth(10)
 linhaSuperior.setFill(color_rgb(10, 100, 10))
 
-linhaInferior = Wall(Point(dl - tilt, dd), Point(width - dr + tilt, dd), name="Parede_inf")
+linhaInferior = Wall((dl - tilt, dd), (width - dr + tilt, dd), name="Parede_inf")
 linhaInferior.setWidth(10)
 linhaInferior.setFill(color_rgb(10, 100, 10))
 
-linhaEsquerda = Wall(Point(dl - tilt, dd), Point(dl + tilt, height - du), name="Parede_esq")
+linhaEsquerda = Wall((dl - tilt, dd), (dl + tilt, height - du), name="Parede_esq")
 linhaEsquerda.setWidth(10)
 linhaEsquerda.setFill(color_rgb(10, 100, 10))
 
-linhaDireita = Wall(Point(width - dr + tilt, dd), Point(width - dr - tilt, height - du), name="Parede_dir")
+linhaDireita = Wall((width - dr + tilt, dd), (width - dr - tilt, height - du), name="Parede_dir")
 linhaDireita.setWidth(10)
 linhaDireita.setFill(color_rgb(10, 100, 10))
 
@@ -63,15 +63,15 @@ info_txt = Text(Point(width / 2, 25), '')
 info_txt.setSize(14)
 
 # barra
-barra = Bar(Point(width/2 - comprimento_barra/2, dd + db + espessura_barra/2),
-            Point(width/2 + comprimento_barra/2, dd + db - espessura_barra/2))
+barra = Bar((width/2 - comprimento_barra/2, dd + db + espessura_barra/2),
+            (width/2 + comprimento_barra/2, dd + db - espessura_barra/2))
 barra.setFill(fill_barra)
 barra.setOutline(outline_barra)
 barra.setWidth(2)
 
 # bolinha
 initial_angle = (2*random.random() - 1) * math.tau / 8 + math.tau / 4
-bola = Ball(Point(width/2, height/2), raio_bola, vel_x=vel_inicial*math.cos(initial_angle), vel_y=vel_inicial*math.sin(initial_angle), lives=vidas_iniciais, name="Bolinha")
+bola = PunyBall((width/2, height/2), raio_bola, vel=(vel_inicial*math.cos(initial_angle), vel_inicial*math.sin(initial_angle)), lives=vidas_iniciais, name="Bolinha")
 bola.setFill(fill_bola)
 bola.setOutline(outline_bola)
 bola.setWidth(2)
@@ -112,12 +112,12 @@ while True:
     obstaculos = []
     for i in range(n_obstaculos):  # cria obstaculos
         radius = random.random() * 30 + 30
-        center = Point((width - dr - dl - 3*radius) * random.random() + dl + 1.5*radius,
-                       (height - du - dd - db - 3*radius) / 3 * random.random() + 2 * (height - du - dd - db - 3*radius) / 3 + dd + db + 1.5 * radius)
+        center = ((width - dr - dl - 3*radius) * random.random() + dl + 1.5*radius,
+                  (height - du - dd - db - 3*radius) / 3 * random.random() + 2 * (height - du - dd - db - 3*radius) / 3 + dd + db + 1.5 * radius)
         if random.random() < 0.5:  # probabilidade de obstaculo ser um circulo
             vel_x = random.gauss(0, 100)
             vel_y = random.gauss(0, 50)
-            obst = Ball(center, radius, vel_x=vel_x, vel_y=vel_y, lives=3)
+            obst = Ball(center, radius, vel=(vel_x, vel_y), lives=3)
             obst.add_obstacle(linhaSuperior)
             obst.add_obstacle(linhaInferior)
             obst.add_obstacle(linhaEsquerda)
