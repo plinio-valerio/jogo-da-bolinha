@@ -78,12 +78,13 @@ bola.setFill(fill_bola)
 bola.setOutline(outline_bola)
 bola.setWidth(2)
 
-
 ################################################################################
 ####                                  JOGO                                  ####
 ################################################################################
 imagem = Image(Point(width / 2, height / 2), "fundojogo2.png")
 imagem.draw(win)
+
+
 def texto(texto):
     texto = Text(Point(width / 2, height / 2), texto)
     texto.setStyle('bold')
@@ -93,6 +94,18 @@ def texto(texto):
     if win.getKey() == "Right" or win.getKey() == "Return":
         texto.undraw()
     return
+
+
+def Poligonos_menu(pse, pid):
+    rec_menu = Rectangle(pse, pid)
+    cir_menu = Circle(Point(pid.getX() + 30, ((pid.getY() - pse.getY()) / 2) + pse.getY()), 10)
+    rec_menu.setOutline("yellow")
+    cir_menu.setOutline("yellow")
+    rec_menu.setWidth(3)
+    cir_menu.setWidth(3)
+    rec_menu.draw(win)
+    cir_menu.draw(win)
+    
 
 
 def historia():
@@ -113,10 +126,10 @@ def historia():
                   " Eles conseguiram escapar do desastre,\n juntamente com alguns habitantes da Terra.\n"
                   " Você é um dos que foram salvos.")
             if win.getKey() == "Right" or win.getKey() == "Return":
-
                 texto("Agora, a sua missão é evitar que o \npequeno planeta azul se perca no Universo,\n"
                       " até que a situação se normalize, \nna esperança de um dia regressar a sua terra natal. ")
-historia()
+
+
 def Iniciar():
     inicio_txt.undraw()
     win.setBackground('white')
@@ -139,7 +152,7 @@ def Iniciar():
         radius = random.random() * 30 + 30
         center = Point((width - dr - dl - 3 * radius) * random.random() + dl + 1.5 * radius,
                        (height - du - dd - db - 3 * radius) / 3 * random.random() + 2 * (
-                                   height - du - dd - db - 3 * radius) / 3 + dd + db + 1.5 * radius)
+                               height - du - dd - db - 3 * radius) / 3 + dd + db + 1.5 * radius)
         if random.random() < 0.5:  # probabilidade de obstaculo ser um circulo
             vel_x = random.gauss(0, 100)
             vel_y = random.gauss(0, 50)
@@ -188,7 +201,7 @@ def Iniciar():
             obst.update(dt)
 
         if bola.lives <= 0:
-            fim_txt = Text(Point(width / 2, height / 2), "GAME\nOVER")
+            fim_txt = Text(Point(width / 2, height / 2), "Que pena!\n A Terra perdeu-se para\n sempre no espaço.")
             fim_txt.setStyle('bold')
             fim_txt.setTextColor("yellow")
             fim_txt.setSize(32)
@@ -223,7 +236,7 @@ def Iniciar():
         t += dt
 
 
-
+historia()
 
 # menu
 while True:
@@ -232,6 +245,7 @@ while True:
     ranking = 'RANKING'
     config = 'CONFIGURAÇÕES'
     opcoes = [iniciar, ranking, config]
+    idx = 0
     inicio_txt = Text(Point(width / 2, height / 2), "{}\n{}\n{}\n".format(iniciar, ranking, config))
     inicio_txt.setStyle('bold')
     inicio_txt.setTextColor('white')
@@ -239,7 +253,23 @@ while True:
     inicio_txt.draw(win)
 
     tecla = win.getKey()
-    if (tecla == 'Escape'):
+    if tecla == "Down":
+        idx = (idx + 1) % len(opcoes)
+    if tecla == "Up":
+        idx = idx - 1 % len(opcoes)
+    if idx == 0:
+        Poligonos_menu((Point(width / 2 - 100, height / 2 + 55)), (Point((width / 2 + 100), (height / 2 + 105))))
+
+    elif idx == 1:
+        Poligonos_menu((Point(width / 2 - 120, height / 2 + 5)), (Point((width / 2 + 120), (height / 2 + 50))))
+
+    elif idx == 2:
+        Poligonos_menu((Point(width / 2 - 200, height / 2 - 60)), (Point((width / 2 + 200), (height / 2 + 5))))
+
+    if tecla == "Return":
+        opcoes[idx()]
+
+    if tecla == 'Escape':
         break
-    Iniciar()
 win.close()
+
