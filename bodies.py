@@ -123,7 +123,7 @@ class Ball(Body):  # only moving body
                         obst.in_contact[self] = True
                     self.on_collision(obst)
                     obst.on_collision(self)
-    def collide(self, obstacle, verbose=False):
+    def collide(self, obstacle, coefficient_of_restitution=1.0, verbose=False):
         assert isinstance(obstacle, Body)
         collision_angle = obstacle.get_normal_angle(self)
         if collision_angle is None:
@@ -144,61 +144,26 @@ class Ball(Body):  # only moving body
             print("\t\tPre-collision total momentum:", m_a * vel_a + m_b * vel_b)
             print("\t\tPre-collision total energy:", 0.5 * m_a * np.linalg.norm(vel_a)**2 + 0.5 * m_b * np.linalg.norm(vel_b)**2)
 
-        # STEP 0: change reference frame so that obstacle has velocity 0
-        #         and its post-collision vel_y is zero (i.e. rotate space so that the collision angle is 0)
-        translation_vector = vel_b.copy()
-        matrix_0     = rotation_matrix(-collision_angle)
-        matrix_0_inv = rotation_matrix( collision_angle)
-        vel_a -= translation_vector
-        vel_b -= translation_vector  # == [.0, .0]
-        vel_a = np.dot(matrix_0, vel_a)
-
         if m_a / m_b == .0:
-            vel_a[0] *= -1.0
-            vel_a = np.dot(matrix_0_inv, vel_a)
-            vel_a += translation_vector
-            self.vel = vel_a.copy()
-            return True
-        if m_b / m_a == .0:
-            # changes reference frame temporarily so that body A is standing still
-            vel_b -= vel_a
-            vel_b[0] *= -1.0  # collision angle is still 0
-            vel_b += vel_a
-            vel_b = np.dot(matrix_0_inv, vel_b)
-            vel_b += translation_vector
-            obstacle.vel = vel_b.copy()
-            return True
+            translation_vector = vel_b.copy()
+        elif m_b / m_a == .0:
+            translation_vector = vel_a.copy()
+        else:
+            translation_vector = (m_a * vel_a + m_b * vel_b) / (m_a + m_b)
+        vel_a -= translation_vector
+        vel_b -= translation_vector
+        rot_matrix     = rotation_matrix(-collision_angle)
+        rot_matrix_inv = rotation_matrix( collision_angle)
+        vel_a = np.dot(rot_matrix, vel_a)
+        vel_b = np.dot(rot_matrix, vel_b)
 
-        # STEP 1: adopt coordinate system in which the x and y axes represent the post-collision velocities of bodies A and B, respectively;
-        #         scale coordinate system (by the square root of the masses) so that conservation of energy yields a circumference.
-        # Conservation of momentum:  m_a * x  + m_b * y  = m_a * vel_a_x
-        # Conservation of energy:    m_a * x² + m_b * y² = m_a * vel_a_x²
-        solution = np.array([vel_a[0], .0])  # pre-collision solution
+        vel_a[0] *= -1.0
+        vel_b[0] *= -1.0
+        vel_a *= coefficient_of_restitution
+        vel_b *= coefficient_of_restitution
 
-        matrix_1 = np.array([[math.sqrt(m_a), .0],
-                             [.0, math.sqrt(m_b)]])
-        matrix_1_inv = np.array([[1.0/math.sqrt(m_a), .0],
-                                 [.0, 1.0/math.sqrt(m_b)]])
-        solution = np.dot(matrix_1, solution)
-
-        # STEP 2: rotate coordinate system so that conservation of momentum yields a line parallel to the x axis
-        # Conservation of momentum:  ²m_a * x  + ²m_b * y  = m_a * vel_a_x
-        # Conservation of energy:    x² + y² = m_a * vel_a_x²
-        line_angle = math.atan(-math.sqrt(m_a/m_b))
-        matrix_2     = rotation_matrix(-line_angle)
-        matrix_2_inv = rotation_matrix( line_angle)
-        solution = np.dot(matrix_2, solution)
-
-        # Under the new coordinate system, the 2 solutions to the conservation equations are symmetric wrt y axis
-        solution[0] *= -1.0  # post-collision solution
-        # solution[0] = 0.0  # solution with the biggest energy loss (perfectly inellastic collision)
-        solution = np.dot(matrix_2_inv, solution)
-        solution = np.dot(matrix_1_inv, solution)
-
-        vel_a[0] = solution[0]
-        vel_b[0] = solution[1]
-        vel_a = np.dot(matrix_0_inv, vel_a)
-        vel_b = np.dot(matrix_0_inv, vel_b)
+        vel_a = np.dot(rot_matrix_inv, vel_a)
+        vel_b = np.dot(rot_matrix_inv, vel_b)
         vel_a += translation_vector
         vel_b += translation_vector
         if verbose:
@@ -207,8 +172,8 @@ class Ball(Body):  # only moving body
             print("\t\tPost-collision total momentum:", m_a * vel_a + m_b * vel_b)
             print("\t\tPost-collision total energy:", 0.5 * m_a * np.linalg.norm(vel_a)**2 + 0.5 * m_b * np.linalg.norm(vel_b)**2)
             print()
-        self.vel = vel_a.copy()
-        obstacle.vel = vel_b.copy()
+        np.copyto(self.vel, vel_a)
+        np.copyto(obstacle.vel, vel_b)
         return True
     def add_obstacle(self, body):
         assert isinstance(body, Body)
@@ -266,22 +231,34 @@ class RegularPolygon(StaticBody):
         super().__init__(body=poly, pos=center, name=name, lives=lives)
     def get_normal_angle(self, projectile):
         assert isinstance(projectile, Ball)
-        position_relative_to_center = projectile.pos - self.pos
-        distance_to_center = np.linalg.norm(position_relative_to_center)
+        position_relative_to_poly = projectile.pos - self.pos
+        distance_to_center = np.linalg.norm(position_relative_to_poly)
         if distance_to_center > projectile.radius + self.radius:
             return None
-        projectile_relative_angle = math.atan2(position_relative_to_center[1], position_relative_to_center[0]) % math.tau
+        projectile_relative_angle = math.atan2(position_relative_to_poly[1], position_relative_to_poly[0])
         central_angle = math.tau / self.n_edges
         idx_v = math.floor(((projectile_relative_angle - self.angle) % math.tau) / central_angle)
-        v1 = self.vertices[idx_v] - self.pos
-        v2 = self.vertices[(idx_v + 1) % self.n_edges] - self.pos
+        v1 = self.vertices[idx_v]
+        v2 = self.vertices[(idx_v + 1) % self.n_edges]
+        edge_length = np.linalg.norm(v2 - v1)
         edge_center = (v1 + v2) / 2
-        position_relative_to_edge = position_relative_to_center - edge_center
-        normal_vector = edge_center / np.linalg.norm(edge_center)
-        distance_to_edge = np.dot(position_relative_to_edge, normal_vector)
-        if distance_to_edge > projectile.radius:
+        position_relative_to_edge = projectile.pos - edge_center
+        edge_normal_vector = edge_center - self.pos
+        edge_normal_vector /= np.linalg.norm(edge_normal_vector)
+        edge_normal_angle = math.atan2(edge_normal_vector[1], edge_normal_vector[0])
+        rotated_position = np.dot(rotation_matrix(-edge_normal_angle), position_relative_to_edge)
+        orthogonal_distance_to_edge = rotated_position[0]
+        parallel_distance_to_edge_center = math.fabs(rotated_position[1])
+        if orthogonal_distance_to_edge > projectile.radius:
             return None
-        return math.atan2(normal_vector[1], normal_vector[0])
+        if parallel_distance_to_edge_center > edge_length / 2:
+            if rotated_position[1] < 0:
+                closest_vertex = v1
+            else:
+                closest_vertex = v2
+            position_relative_to_vertex = projectile.pos - closest_vertex
+            return math.atan2(position_relative_to_vertex[1], position_relative_to_vertex[0])
+        return edge_normal_angle
 
 class Wall(StaticBody):
     obj_idx = 0

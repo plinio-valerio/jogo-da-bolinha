@@ -122,8 +122,6 @@ while True:
             obst.add_obstacle(linhaInferior)
             obst.add_obstacle(linhaEsquerda)
             obst.add_obstacle(linhaDireita)
-            for obst_2 in obstaculos:
-                obst.add_obstacle(obst_2)
         else:
             n_lados = random.randint(3, 8)
             angulo = random.random() * math.tau / n_lados
@@ -138,6 +136,11 @@ while True:
         obst.add_reaper(bola)
         obst.draw(win)
         obstaculos.append(obst)
+    for obst in obstaculos:
+        if isinstance(obst, StaticBody):
+            continue
+        for obst_2 in obstaculos:
+            obst.add_obstacle(obst_2)
     bola.draw(win)
     barra.draw(win)
     time.sleep(1)
