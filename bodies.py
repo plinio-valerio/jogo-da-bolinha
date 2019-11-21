@@ -7,10 +7,15 @@ def rotation_matrix(angle):
                      [math.sin(angle),  math.cos(angle)]])
 
 class Universe:
-    def __init__(self):
-        pass
-    def update(self):
-        pass
+    def __init__(self, window):
+        assert isinstance(window, GraphWin)
+        self.window = window
+        self.static_bodies = set()
+        self.moving_bodies = set(
+    def update(self, dt=1.0):
+        for body in self.moving_bodies:
+            body.update(dt=dt)
+        raise NotImplementedError
 
 class Body:
     obj_idx = 0

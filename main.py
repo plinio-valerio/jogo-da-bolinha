@@ -29,7 +29,8 @@ pontos_por_fase = 3  # quantidade de pontos necessaria para acelerar a bolinha
 vel_inicial = 400.0  # velocidade inicial da bolinha, em pixels/segundo
 dt = 0.020  # intervalo de tempo entre dois frames do jogo, em segundos
 
-n_obstaculos = 6
+n_obstaculos_fixos = 4
+n_obstaculos_moveis = 4
 
 ################################################################################
 
@@ -110,22 +111,13 @@ while True:
     bola.add_obstacle(barra)
     bola.add_reaper(linhaInferior)
     obstaculos = []
-    for i in range(n_obstaculos):  # cria obstaculos
+    for i in range(n_obstaculos_fixos):
         radius = random.random() * 30 + 30
         center = ((width - dr - dl - 3*radius) * random.random() + dl + 1.5*radius,
                   (height - du - dd - db - 3*radius) / 3 * random.random() + 2 * (height - du - dd - db - 3*radius) / 3 + dd + db + 1.5 * radius)
-        if random.random() < 0.5:  # probabilidade de obstaculo ser um circulo
-            vel_x = random.gauss(0, 100)
-            vel_y = random.gauss(0, 50)
-            obst = Ball(center, radius, vel=(vel_x, vel_y), lives=3)
-            obst.add_obstacle(linhaSuperior)
-            obst.add_obstacle(linhaInferior)
-            obst.add_obstacle(linhaEsquerda)
-            obst.add_obstacle(linhaDireita)
-        else:
-            n_lados = random.randint(3, 8)
-            angulo = random.random() * math.tau / n_lados
-            obst = RegularPolygon(center, radius, n_lados, angulo, lives=3)
+        n_lados = random.randint(3, 8)
+        angulo = random.random() * math.tau / n_lados
+        obst = RegularPolygon(center, radius, n_lados, angulo, lives=3)
         color_r = random.randrange(0, 256)
         color_g = random.randrange(0, 256)
         color_b = random.randrange(0, 256)
@@ -133,14 +125,31 @@ while True:
         obst.setOutline(color_rgb((color_r + 128) % 256, (color_g + 128) % 256, (color_b + 128) % 256))
         obst.setWidth(2)
         bola.add_obstacle(obst)
-        obst.add_reaper(bola)
         obst.draw(win)
         obstaculos.append(obst)
-    for obst in obstaculos:
-        if isinstance(obst, StaticBody):
-            continue
+    for i in range(n_obstaculos_moveis):
+        radius = random.random() * 30 + 30
+        center = ((width - dr - dl - 3*radius) * random.random() + dl + 1.5*radius,
+                  (height - du - dd - db - 3*radius) / 3 * random.random() + 2 * (height - du - dd - db - 3*radius) / 3 + dd + db + 1.5 * radius)
+        vel_x = random.gauss(0, 100)
+        vel_y = random.gauss(0, 50)
+        obst = Ball(center, radius, vel=(vel_x, vel_y), lives=3)
+        color_r = random.randrange(0, 256)
+        color_g = random.randrange(0, 256)
+        color_b = random.randrange(0, 256)
+        obst.setFill(color_rgb(color_r, color_g, color_b))
+        obst.setOutline(color_rgb((color_r + 128) % 256, (color_g + 128) % 256, (color_b + 128) % 256))
+        obst.setWidth(2)
+        obst.add_obstacle(linhaSuperior)
+        obst.add_obstacle(linhaInferior)
+        obst.add_obstacle(linhaEsquerda)
+        obst.add_obstacle(linhaDireita)
+        obst.add_reaper(bola)
+        bola.add_obstacle(obst)
+        obst.draw(win)
         for obst_2 in obstaculos:
             obst.add_obstacle(obst_2)
+        obstaculos.append(obst)
     bola.draw(win)
     barra.draw(win)
     time.sleep(1)
