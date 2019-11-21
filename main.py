@@ -48,8 +48,8 @@ barra.setOutline(outline_barra)
 barra.setWidth(2)
 
 # bolinha
-initial_angle = (2 * random.random() - 1) * math.tau / 8 + math.tau / 4
-bola = PunyBall((width / 2, height / 2), raio_bola, vel=(vel_inicial * math.cos(initial_angle), vel_inicial * math.sin(initial_angle)),
+initial_angle = (2 * random.random() - 1) * math.tau / 8 - math.tau / 4
+bola = PunyBall((width / 2, height - du - 50), raio_bola, vel=(vel_inicial * math.cos(initial_angle), vel_inicial * math.sin(initial_angle)),
                  lives=vidas_iniciais, name="Bolinha")
 bola.setFill(fill_bola)
 bola.setOutline(outline_bola)
@@ -272,7 +272,6 @@ def Iniciar():
 while True:
     historia()
     while True:
-
         win.setBackground('black')
         iniciar = 'INICIAR'
         ranking = 'RANKING'
