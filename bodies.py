@@ -1,21 +1,166 @@
 from graphics import *
 import math
+import random
 import numpy as np
 
 def rotation_matrix(angle):
     return np.array([[math.cos(angle), -math.sin(angle)],
                      [math.sin(angle),  math.cos(angle)]])
 
-class Universe:
-    def __init__(self, window):
-        assert isinstance(window, GraphWin)
-        self.window = window
-        self.static_bodies = set()
-        self.moving_bodies = set(
+class Game:
+    win_width = 960
+    win_height = 640
+    du = 30  # distance from upper screen limit to upper wall
+    dd = 50  # distance from lower screen limit to lower wall
+    dl = 30  # distance from left screen limit to left wall
+    dr = 30  # distance from right screen limit to right wall
+    db = 60  # distance from bar to lower screen limit
+    tilt = 10  # inclination of lateral walls
+    wall_color = (10, 100, 10)
+    wall_width = 10
+    ball_radius = 10
+    ball_lives = 3
+    vel_ball_0 = 400.0
+    bar_length = 100
+    bar_height = 10
+    vel_bar = 1250.0
+    n_static_obstacles = 4
+    n_moving_obstacles = 4
+    obst_lives = 3
+    def __init__(self):
+        self.static_obstacles = set()
+        self.moving_obstacles = set()
+        self.window = GraphWin("Blue Ball", self.win_width, self.win_height)
+        self.window.setCoords(0, 0, self.win_width, self.win_height)
+    def clear(self):
+        self.ball.undraw()
+        self.bar.undraw()
+        for obst in self.moving_obstacles:
+            obst.undraw()
+        for obst in self.static_obstacles:
+            obst.undraw()
+    def reset(self):
+        self.t = .0
+        self.window.setBackground('white')
+        self.moving_obstacles = set()
+        self.static_obstacles = set()
+        vel_ball_angle = math.tau/4 + (2*random.random() - 1) * math.tau/8
+        vel_ball = (self.vel_ball_0 * math.cos(vel_ball_angle), self.vel_ball_0 * math.sin(vel_ball_angle))
+        self.ball = PunyBall((self.win_width/2, self.win_height/2), self.ball_radius, vel=vel_ball, lives=self.ball_lives, name="PunyBalll")
+        self.ball.setFill((8, 8, 192))
+        self.ball.setOutline((255, 255, 0))
+        self.ball.setWidth(2)
+        self.ball.reset()
+        self.ball.draw(self.window)
+        self.bar = Bar((self.win_width/2 - self.bar_length/2, self.dd + self.db + self.bar_height/2),
+                       (self.win_width/2 + self.bar_length/2, self.dd + self.db - self.bar_height/2))
+        self.bar.setFill((100, 10, 10))
+        self.bar.setOutline((255, 255, 0))
+        self.bar.setWidth(2)
+        self.bar.reset()
+        self.ball.add_obstacle(self.bar)
+        self.bar.draw(self.window)
+        p_dl = (self.dl - self.tilt, self.dd)
+        p_ul = (self.dl + self.tilt, self.win_height - self.du)
+        p_dr = (self.win_width - self.dr + self.tilt, self.dd)
+        p_ur = (self.win_width - self.dr - self.tilt, self.win_height - self.du)
+        wall_l = Wall(p_dl, p_ul, name="Left Wall")
+        wall_l.setFill(self.wall_color)
+        wall_l.setWidth(self.wall_width)
+        self.static_obstacles.add(wall_l)
+        wall_l.reset()
+        self.ball.add_obstacle(wall_l)
+        wall_l.draw(self.window)
+        wall_d = Wall(p_dl, p_dr, name="Lower Wall")
+        wall_d.setFill(self.wall_color)
+        wall_d.setWidth(self.wall_width)
+        self.static_obstacles.add(wall_d)
+        wall_d.reset()
+        self.ball.add_obstacle(wall_d)
+        self.ball.add_reaper(wall_d)
+        wall_d.draw(self.window)
+        wall_u = Wall(p_ul, p_ur, name="Upper Wall")
+        wall_u.setFill(self.wall_color)
+        wall_u.setWidth(self.wall_width)
+        self.static_obstacles.add(wall_u)
+        wall_u.reset()
+        self.ball.add_obstacle(wall_u)
+        wall_u.draw(self.window)
+        wall_r = Wall(p_dr, p_ur, name="Right Wall")
+        wall_r.setFill(self.wall_color)
+        wall_r.setWidth(self.wall_width)
+        self.static_obstacles.add(wall_r)
+        wall_r.reset()
+        self.ball.add_obstacle(wall_r)
+        wall_r.draw(self.window)
+        for i in range(self.n_static_obstacles):
+            n_edges = random.randint(3, 6)
+            radius = 30 * random.random() + 30
+            angle = math.tau * random.random()
+            center = ((self.win_width - self.dr - self.dl - 3*radius) * random.random() + self.dl + 1.5*radius,
+                      (self.win_height - self.du - self.dd - self.db - 3*radius) / 3 * random.random() + \
+                       2 * (self.win_height - self.du - self.dd - self.db - 3*radius) / 3 + self.dd + self.db + 1.5 * radius)
+            obst = RegularPolygon(center, radius, n_edges, angle)
+            color_r = random.randrange(0, 256)
+            color_g = random.randrange(0, 256)
+            color_b = random.randrange(0, 256)
+            obst.setFill((color_r, color_g, color_b))
+            obst.setOutline(((color_r + 128) % 256, (color_g + 128) % 256, (color_b + 128) % 256))
+            obst.setWidth(2)
+            self.ball.add_obstacle(obst)
+            obst.add_reaper(self.ball)
+            obst.reset()
+            obst.draw(self.window)
+            self.static_obstacles.add(obst)
+        for i in range(self.n_moving_obstacles):
+            radius = 30 * random.random() + 30
+            center = ((self.win_width - self.dr - self.dl - 3*radius) * random.random() + self.dl + 1.5*radius,
+                      (self.win_height - self.du - self.dd - self.db - 3*radius) / 3 * random.random() + \
+                       2 * (self.win_height - self.du - self.dd - self.db - 3*radius) / 3 + self.dd + self.db + 1.5 * radius)
+            vel_obst_modulus = random.gauss(90, 15)
+            vel_obst_angle = random.random() * math.tau
+            vel_obst = (vel_obst_modulus * math.cos(vel_obst_angle), vel_obst_modulus * math.sin(vel_obst_angle))
+            obst = Ball(center, radius, vel=vel_obst, lives=self.obst_lives)
+            color_r = random.randrange(0, 256)
+            color_g = random.randrange(0, 256)
+            color_b = random.randrange(0, 256)
+            obst.setFill((color_r, color_g, color_b))
+            obst.setOutline(((color_r + 128) % 256, (color_g + 128) % 256, (color_b + 128) % 256))
+            obst.setWidth(2)
+            obst.add_reaper(self.ball)
+            self.ball.add_obstacle(obst)
+            for obst_2 in self.static_obstacles:
+                obst.add_obstacle(obst_2)
+            for obst_2 in self.moving_obstacles:
+                obst.add_obstacle(obst_2)
+            obst.reset()
+            obst.draw(self.window)
+            self.moving_obstacles.add(obst)
     def update(self, dt=1.0):
-        for body in self.moving_bodies:
-            body.update(dt=dt)
-        raise NotImplementedError
+        self.ball.update(dt)
+        self.bar.update(dt)
+        next_moving_obstacles = self.moving_obstacles.copy()
+        for body in self.moving_obstacles:
+            ans = body.update(dt)
+            if ans is not None:
+                print(body.name, "died lol")
+                next_moving_obstacles.remove(body)
+                alpha, beta = ans
+                body.undraw()
+                alpha.draw(self.window)
+                beta.draw(self.window)
+                alpha.add_obstacle(beta)
+                beta.add_obstacle(alpha)
+                for obst in self.static_obstacles:
+                    alpha.add_obstacle(obst)
+                    beta.add_obstacle(obst)
+                for obst in next_moving_obstacles:
+                    alpha.add_obstacle(obst)
+                    beta.add_obstacle(obst)
+                next_moving_obstacles.add(alpha)
+                next_moving_obstacles.add(beta)
+        self.moving_obstacles = next_moving_obstacles
+        self.t += dt
 
 class Body:
     obj_idx = 0
@@ -36,17 +181,66 @@ class Body:
         self.mass = float(mass)
         self.pos_0 = self.pos.copy()
         self.vel_0 = self.vel.copy()
+        self.next_vel = self.vel.copy()
         self.lives = lives
+        self.fill = None
+        self.outline = (0, 0, 0)
         self.width = 1
         self.n_collisions = 0
         self.reapers = set()
         self.victims = set()
+        self.obstacles = set()
+        self.in_contact = {}
         self.interactions = set()
     def reset(self):
         delta = self.pos_0 - self.pos
         self.body.move(delta[0], delta[1])
         np.copyto(self.pos, self.pos_0)
         np.copyto(self.vel, self.vel_0)
+        np.copyto(self.next_vel, self.vel_0)
+        for obst in self.obstacles:
+            self.in_contact[obst] = True
+    def update(self, dt=1.0):
+        assert dt > .0
+        np.copyto(self.vel, self.next_vel)
+        delta = self.vel * dt
+        self.pos += delta
+        self.body.move(delta[0], delta[1])
+        for obst in self.obstacles:
+            if self.in_contact[obst]:
+                collision_angle = obst.get_normal_angle(self)
+                if collision_angle is None:
+                    self.in_contact[obst] = False
+            else:
+                collision_angle = obst.get_normal_angle(self)
+                if collision_angle is None:
+                    continue
+                self.in_contact[obst] = True
+                self.n_collisions += 1
+                self.on_collision(obst)
+                if self.lives is not None and self.lives <= 0:
+                    divide = True
+                    coefficient_of_restitution = 0.25 * random.random() + 0.5
+                    alpha, beta = self.collide(obst, collision_angle, coefficient_of_restitution, divide)
+                    return alpha, beta
+                else:
+                    self.collide(obst, collision_angle)
+                    return None
+    def on_collision(self, body):
+        assert isinstance(body, Body)
+        if body in self.reapers and self.lives is not None:
+            self.lives -= 1
+            self.on_life_loss()
+    def on_life_loss(self):
+        pass
+    # def on_death(self):
+    #     for body in self.victims:
+    #         body.remove_reaper(self)
+    #     for body in self.reapers:
+    #         self.remove_reaper(body)
+    #     for body in self.interactions:
+    #         body.remove_obstacle(self)
+    #     self.undraw()
     def add_reaper(self, body):
         assert isinstance(body, Body)
         self.reapers.add(body)
@@ -55,36 +249,34 @@ class Body:
         assert isinstance(body, Body)
         self.reapers.discard(body)
         body.victims.discard(self)
-    def update(self, dt=1.0):
-        raise NotImplementedError
+    def add_obstacle(self, body):
+        assert isinstance(body, Body)
+        self.obstacles.add(body)
+        self.in_contact[body] = True
+        body.interactions.add(self)
+    def remove_obstacle(self, body):
+        assert isinstance(body, Body)
+        self.obstacles.discard(body)
+        self.in_contact.pop(body, None)
+        body.interactions.discard(self)
     def get_normal_angle(self, corpo):
         raise NotImplementedError
-    def on_collision(self, body):
-        assert isinstance(body, Body)
-        self.n_collisions += 1
-        if body in self.reapers and self.lives is not None:
-            self.lives -= 1
-            if self.lives <= 0:
-                self.on_death
-    def on_life_loss(self):
-        pass
-    def on_death(self):
-        for body in self.victims:
-            body.remove_reaper(self)
-        for body in self.reapers:
-            self.remove_reaper(body)
-        for body in self.interactions:
-            body.remove_obstacle(self)
-        self.undraw()
     def draw(self, win):
         self.body.draw(win)
     def undraw(self):
         self.body.undraw()
-    def setFill(self, color):
-        self.body.setFill(color)
     def setOutline(self, color):
         self.body.setOutline(color)
+    def setFill(self, color):
+        assert len(color) == 3
+        self.fill = tuple(color)
+        self.body.setFill(color_rgb(self.fill[0], self.fill[1], self.fill[2]))
+    def setOutline(self, color):
+        assert len(color) == 3
+        self.outline = tuple(color)
+        self.body.setOutline(color_rgb(self.outline[0], self.outline[1], self.outline[2]))
     def setWidth(self, width):
+        assert width >= .0
         self.width = width
         self.body.setWidth(width)
 
@@ -105,34 +297,13 @@ class Ball(Body):  # only moving body
         if mass is None:
             mass = math.pi * radius**2
         self.radius = float(radius)
-        self.obstacles = set()
-        self.in_contact = {}
         super().__init__(body=Circle(Point(center[0], center[1]), self.radius), mass=mass, pos=center, vel=vel, name=name, lives=lives)
-    def update(self, dt=1.0):
-        assert dt > .0
-        delta = self.vel * dt
-        self.pos += delta
-        self.body.move(delta[0], delta[1])
-        for obst in self.obstacles:
-            if self.in_contact[obst]:
-                collision_angle = obst.get_normal_angle(self)
-                if collision_angle is None:
-                    self.in_contact[obst] = False
-                    if isinstance(obst, Ball):
-                        obst.in_contact[self] = False
-            else:
-                touched = self.collide(obst)
-                if touched:
-                    self.in_contact[obst] = True
-                    if isinstance(obst, Ball):
-                        obst.in_contact[self] = True
-                    self.on_collision(obst)
-                    obst.on_collision(self)
-    def collide(self, obstacle, coefficient_of_restitution=1.0, verbose=False):
+    def collide(self, obstacle, collision_angle, coefficient_of_restitution=1.0, divide=False, verbose=False):
         assert isinstance(obstacle, Body)
-        collision_angle = obstacle.get_normal_angle(self)
-        if collision_angle is None:
-            return False
+        assert divide is False or coefficient_of_restitution < 1.0
+        # collision_angle = obstacle.get_normal_angle(self)
+        # if collision_angle is None:
+        #     return False
         m_a = self.mass
         m_b = obstacle.mass
         vel_a = self.vel.copy()
@@ -157,39 +328,70 @@ class Ball(Body):  # only moving body
             translation_vector = (m_a * vel_a + m_b * vel_b) / (m_a + m_b)
         vel_a -= translation_vector
         vel_b -= translation_vector
-        rot_matrix     = rotation_matrix(-collision_angle)
-        rot_matrix_inv = rotation_matrix( collision_angle)
-        vel_a = np.dot(rot_matrix, vel_a)
-        vel_b = np.dot(rot_matrix, vel_b)
+        matrix_1     = rotation_matrix(-collision_angle)
+        matrix_1_inv = rotation_matrix( collision_angle)
+        vel_a = np.dot(matrix_1, vel_a)
+        vel_b = np.dot(matrix_1, vel_b)
+        energy = 0.5 * m_a * np.linalg.norm(vel_a)**2 + 0.5 * m_b * np.linalg.norm(vel_b)**2
 
         vel_a[0] *= -1.0
         vel_b[0] *= -1.0
         vel_a *= coefficient_of_restitution
         vel_b *= coefficient_of_restitution
-
-        vel_a = np.dot(rot_matrix_inv, vel_a)
-        vel_b = np.dot(rot_matrix_inv, vel_b)
-        vel_a += translation_vector
-        vel_b += translation_vector
-        if verbose:
-            print("\tPost-collision velocity (A):", vel_a)
-            print("\tPost-collision velocity (B):", vel_b)
-            print("\t\tPost-collision total momentum:", m_a * vel_a + m_b * vel_b)
-            print("\t\tPost-collision total energy:", 0.5 * m_a * np.linalg.norm(vel_a)**2 + 0.5 * m_b * np.linalg.norm(vel_b)**2)
-            print()
-        np.copyto(self.vel, vel_a)
-        np.copyto(obstacle.vel, vel_b)
-        return True
-    def add_obstacle(self, body):
-        assert isinstance(body, Body)
-        self.obstacles.add(body)
-        self.in_contact[body] = False
-        body.interactions.add(self)
-    def remove_obstacle(self, body):
-        assert isinstance(body, Body)
-        self.obstacles.discard(body)
-        self.in_contact.pop(body, None)
-        body.interactions.discard(self)
+        if divide:
+            # Rotates plane so that object A's velocity has angle 0
+            vel_a_angle = math.atan2(vel_a[1], vel_a[0])
+            matrix_2     = rotation_matrix(-vel_a_angle)
+            matrix_2_inv = rotation_matrix( vel_a_angle)
+            vel_alpha = np.dot(vel_a, matrix_2)
+            vel_beta = vel_alpha.copy()
+            m_alpha = m_a / 2
+            m_beta = m_a - m_alpha
+            energy_loss = energy * (1 - coefficient_of_restitution**2)
+            vel_alpha[1] += math.sqrt(energy_loss / m_alpha)
+            vel_beta[1]  -= math.sqrt(energy_loss / m_beta)
+            vel_alpha = np.dot(matrix_2_inv, vel_alpha)
+            vel_beta  = np.dot(matrix_2_inv, vel_beta)
+            vel_alpha = np.dot(matrix_1_inv, vel_alpha)
+            vel_beta  = np.dot(matrix_1_inv, vel_beta)
+            vel_b     = np.dot(matrix_1_inv, vel_b)
+            vel_alpha += translation_vector
+            vel_beta  += translation_vector
+            vel_b     += translation_vector
+            if verbose:
+                print("\tm_a' = %.2f" % m_alpha)
+                print('\tm_a" = %.2f' % m_beta)
+                print("\tm_b = %.2f" % m_b)
+                print("\tPost-collision velocity (A'):", vel_alpha)
+                print('\tPost-collision velocity (A"):', vel_beta)
+                print("\tPost-collision velocity (B):", vel_b)
+                print("\t\tPost-collision total momentum:", m_alpha * vel_alpha + m_beta * vel_beta + m_b * vel_b)
+                print("\t\tPost-collision total energy:", 0.5*m_alpha*np.linalg.norm(vel_alpha)**2 + 0.5*m_beta*np.linalg.norm(vel_beta)**2 + 0.5*m_b*np.linalg.norm(vel_b)**2)
+                print()
+            alpha = Ball(self.pos, self.radius/math.sqrt(2), vel=vel_alpha)
+            alpha.setFill(self.fill)
+            alpha.setOutline(self.outline)
+            alpha.setWidth(self.width)
+            beta = Ball(self.pos, self.radius/math.sqrt(2), vel=vel_beta)
+            beta.setFill(self.fill)
+            beta.setOutline(self.outline)
+            beta.setWidth(self.width)
+            np.copyto(obstacle.next_vel, vel_b)
+            return alpha, beta
+        else:
+            vel_a = np.dot(matrix_1_inv, vel_a)
+            vel_b = np.dot(matrix_1_inv, vel_b)
+            vel_a += translation_vector
+            vel_b += translation_vector
+            if verbose:
+                print("\tPost-collision velocity (A):", vel_a)
+                print("\tPost-collision velocity (B):", vel_b)
+                print("\t\tPost-collision total momentum:", m_a * vel_a + m_b * vel_b)
+                print("\t\tPost-collision total energy:", 0.5 * m_a * np.linalg.norm(vel_a)**2 + 0.5 * m_b * np.linalg.norm(vel_b)**2)
+                print()
+            np.copyto(self.next_vel, vel_a)
+            np.copyto(obstacle.next_vel, vel_b)
+            return self
     def get_normal_angle(self, projectile):
         assert isinstance(projectile, Body)
         relative_position = projectile.pos - self.pos
@@ -200,7 +402,9 @@ class Ball(Body):  # only moving body
 
 class PunyBall(Ball):
     def on_life_loss(self):
-        self.reset()
+        if self.lives > 0:
+            self.reset()
+            time.sleep(1)
 
 ################################################################################
 
@@ -213,8 +417,6 @@ class StaticBody(Body):
         if name is None:
             name = "PunyBall_" + str(StaticBody.obj_idx)
         super().__init__(body=body, mass=math.inf, pos=pos, vel=(.0,.0), name=name, lives=lives)
-    def update(self, dt=1.0):
-        pass
 
 class RegularPolygon(StaticBody):
     obj_idx = 0
